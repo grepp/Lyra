@@ -1,0 +1,51 @@
+import clsx from 'clsx';
+import { FileCode, LayoutDashboard, PlusCircle, Settings, Terminal } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+
+const navItems = [
+  { name: 'Dashboard', path: '/', icon: LayoutDashboard },
+  { name: 'Provisioning', path: '/provisioning', icon: PlusCircle },
+  { name: 'Terminal', path: '/terminal', icon: Terminal },
+  { name: 'Templates', path: '/templates', icon: FileCode },
+  { name: 'Settings', path: '/settings', icon: Settings },
+];
+
+export default function Sidebar() {
+  const location = useLocation();
+
+  return (
+    <div className="w-64 bg-[#18181b] border-r border-[#27272a] flex flex-col">
+      <div className="p-6">
+        <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+          GPU-Vibe
+        </h1>
+      </div>
+      <nav className="flex-1 px-4 space-y-2">
+        {navItems.map((item) => {
+          const isActive = location.pathname === item.path;
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={clsx(
+                "flex items-center px-4 py-3 rounded-lg transition-all duration-200 group",
+                isActive 
+                  ? "bg-blue-600/10 text-blue-400" 
+                  : "text-gray-400 hover:bg-[#27272a] hover:text-white"
+              )}
+            >
+              <item.icon size={20} className={clsx("mr-3", isActive ? "text-blue-400" : "group-hover:text-white")} />
+              <span className="font-medium">{item.name}</span>
+            </Link>
+          );
+        })}
+      </nav>
+      <div className="p-4 border-t border-[#27272a]">
+        <div className="flex items-center gap-3 text-sm text-gray-500">
+           <div className="w-2 h-2 rounded-full bg-green-500"></div>
+           System Status: Online
+        </div>
+      </div>
+    </div>
+  );
+}

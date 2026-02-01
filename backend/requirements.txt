@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+asyncpg
+celery
+redis
+docker
+pynvml
+python-multipart
+websockets
+psycopg2-binary
+pytest
+httpx
+ptyprocess
