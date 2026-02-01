@@ -3,8 +3,9 @@ import axios from 'axios';
 import clsx from 'clsx';
 import { FolderOpen, Play, Plus, Save, Trash2, Upload } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
+import { useToast } from '../context/ToastContext';
 
 interface MountPoint {
   host_path: string;
@@ -14,6 +15,8 @@ interface MountPoint {
 
 export default function Provisioning() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { showToast } = useToast();
   const [name, setName] = useState('');
   const [password, setPassword] = useState('admin');
 
@@ -39,20 +42,39 @@ export default function Provisioning() {
   const [totalGpus, setTotalGpus] = useState(0);
 
   const [mounts, setMounts] = useState<MountPoint[]>([]);
+  const [dockerfile, setDockerfile] = useState('FROM python:3.11-slim\n\n');
 
-  // Fetch GPU Resources
+  // Fetch GPU Resources and Load Template
   useEffect(() => {
+    // 1. Fetch GPU Info
     axios.get('resources/gpu')
       .then(res => {
          setMaxGpus(res.data.available);
          setTotalGpus(res.data.total);
-         // Default to 1 if available, otherwise 0
-         setGpuCount(res.data.available > 0 ? 1 : 0);
+
+         // 2. Load Template if exists
+         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+         const state = location.state as { templateConfig?: any };
+         if (state && state.templateConfig) {
+             const config = state.templateConfig;
+
+             // Only load Dockerfile content
+             if (config.dockerfile_content) setDockerfile(config.dockerfile_content);
+
+             // Clear state so refresh doesn't reload template
+             window.history.replaceState({}, document.title);
+
+             // Default GPU count fallback
+             setGpuCount(0);
+
+             // Show a toast or notification? (Optional)
+         } else {
+             // Default behavior
+             setGpuCount(0);
+         }
       })
       .catch(err => console.error("Failed to fetch GPU resources", err));
-  }, []);
-
-  const [dockerfile, setDockerfile] = useState('FROM python:3.11-slim\n\n');
+  }, [location.state]);
 
   const handleAddMount = () => {
     setMounts([...mounts, { host_path: '', container_path: '', mode: 'rw' }]);
@@ -93,7 +115,8 @@ export default function Provisioning() {
         container_user: 'root',
         root_password: password,
         mount_config: validMounts,
-        dockerfile_content: dockerfile
+        dockerfile_content: dockerfile,
+        gpu_count: gpuCount
       };
 
       // Relative path works thanks to Nginx proxy
@@ -106,6 +129,72 @@ export default function Provisioning() {
     }
   };
 
+  // Template Save State
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [templateDesc, setTemplateDesc] = useState('');
+  const [templateErrors, setTemplateErrors] = useState<{name?: string}>({});
+
+  const handleSaveTemplate = async () => {
+      if (!templateName.trim()) {
+          setTemplateErrors({ name: "Template name is required." });
+          return;
+      }
+      setTemplateErrors({});
+
+      try {
+          // Only save Dockerfile content as requested
+          const config = {
+              dockerfile_content: dockerfile
+          };
+
+          await axios.post('templates/', {
+              name: templateName,
+              description: templateDesc,
+              config: config
+          });
+
+          setIsSaveModalOpen(false);
+          setTemplateName('');
+          setTemplateDesc('');
+          showToast("Template saved successfully!", "success");
+      } catch (error) {
+          console.error("Failed to save template", error);
+          showToast("Failed to save template.", "error");
+      }
+  };
+
+  // Template Load State
+  interface Template {
+      id: string;
+      name: string;
+      description: string;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      config: any;
+      created_at: string;
+  }
+  const [isLoadModalOpen, setIsLoadModalOpen] = useState(false);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
+
+  useEffect(() => {
+      if (isLoadModalOpen) {
+          fetchTemplates();
+      }
+  }, [isLoadModalOpen]);
+
+  const fetchTemplates = async () => {
+    try {
+      setIsLoadingTemplates(true);
+      const res = await axios.get('templates/');
+      setTemplates(res.data);
+    } catch (error) {
+      console.error("Failed to fetch templates", error);
+    } finally {
+      setIsLoadingTemplates(false);
+    }
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8 pb-20 relative">
       <Modal
@@ -115,6 +204,66 @@ export default function Provisioning() {
           message={modalConfig.message}
           type={modalConfig.type}
       />
+
+      {/* Save Template Modal */}
+      {isSaveModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-[#18181b] rounded-xl border border-[#3f3f46] shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="p-6 space-y-4">
+                    <h3 className="text-xl font-bold text-white">Save as Template</h3>
+
+                    <div className="space-y-1">
+                        <label className="text-sm font-medium text-gray-400">Template Name</label>
+                        <input
+                            value={templateName}
+                            onChange={(e) => {
+                                setTemplateName(e.target.value);
+                                if (templateErrors.name) setTemplateErrors({});
+                            }}
+                            className={clsx(
+                                "w-full bg-[#27272a] border rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-1 transition-all",
+                                templateErrors.name
+                                    ? "border-red-500/50 focus:border-red-500 focus:ring-red-500/20"
+                                    : "border-[#3f3f46] focus:border-blue-500 focus:ring-blue-500"
+                            )}
+                            placeholder="My Template"
+                        />
+                         {templateErrors.name && (
+                            <p className="text-xs text-red-400 mt-1">{templateErrors.name}</p>
+                        )}
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-sm font-medium text-gray-400">Description</label>
+                        <textarea
+                            value={templateDesc}
+                            onChange={(e) => setTemplateDesc(e.target.value)}
+                            className="w-full bg-[#27272a] border border-[#3f3f46] rounded-lg px-4 py-2 text-white focus:border-blue-500 focus:outline-none resize-none h-24"
+                            placeholder="Optional description..."
+                        />
+                    </div>
+                </div>
+                <div className="p-4 border-t border-[#3f3f46] flex justify-end gap-3 bg-[#27272a]/50">
+                    <button
+                        onClick={() => {
+                            setIsSaveModalOpen(false);
+                            setTemplateErrors({});
+                        }}
+                        className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-[#3f3f46] transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleSaveTemplate}
+                        className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20 transition-all"
+                    >
+                        Save Template
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
       <header className="flex justify-between items-center">
         <div>
           <h2 className="text-3xl font-bold text-white tracking-tight">New Environment</h2>
@@ -297,14 +446,14 @@ export default function Provisioning() {
                 </div>
                 <div className="flex gap-2">
                     <button
-                        onClick={() => showAlert("Coming Soon", "Template loading functionality will be implemented soon.")}
+                        onClick={() => setIsLoadModalOpen(true)}
                         className="px-3 py-1.5 bg-[#27272a] hover:bg-[#3f3f46] text-gray-300 hover:text-white rounded-md flex items-center gap-2 transition-colors border border-[#3f3f46] text-xs font-medium"
                     >
                         <Upload size={14} />
                         <span>Load</span>
                     </button>
                     <button
-                        onClick={() => showAlert("Coming Soon", "Template saving functionality will be implemented soon.")}
+                        onClick={() => setIsSaveModalOpen(true)}
                         className="px-3 py-1.5 bg-[#27272a] hover:bg-[#3f3f46] text-gray-300 hover:text-white rounded-md flex items-center gap-2 transition-colors border border-[#3f3f46] text-xs font-medium"
                     >
                         <Save size={14} />
@@ -312,7 +461,6 @@ export default function Provisioning() {
                     </button>
                 </div>
              </div>
-
              <div className="flex-1 relative">
                 <Editor
                     height="100%"
@@ -331,6 +479,69 @@ export default function Provisioning() {
              </div>
         </div>
       </div>
+
+      {/* Load Template Modal */}
+      {isLoadModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-[#18181b] rounded-xl border border-[#3f3f46] shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[80vh]">
+                <div className="p-6 border-b border-[#27272a] flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-white">Load Template</h3>
+                </div>
+
+                <div className="p-4 overflow-y-auto space-y-3 flex-1 bg-[#18181b]">
+                    {isLoadingTemplates ? (
+                         <div className="text-center py-10">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+                            <p className="text-gray-400 text-sm">Loading templates...</p>
+                        </div>
+                    ) : templates.length === 0 ? (
+                        <div className="text-center py-10 text-gray-400">
+                            <p>No templates found.</p>
+                        </div>
+                    ) : (
+                        templates.map((template) => (
+                             <div key={template.id} className="bg-[#202023] rounded-lg border border-[#3f3f46] p-4 flex items-center justify-between group hover:border-[#52525b] transition-all">
+                                <div className="min-w-0 flex-1 mr-4">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h4 className="font-bold text-white truncate">{template.name}</h4>
+                                        <span className="text-[10px] bg-[#27272a] text-gray-500 px-1.5 py-0.5 rounded border border-[#3f3f46]">
+                                            {new Date(template.created_at).toLocaleDateString()}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs text-gray-400 truncate">
+                                        {template.description || "No description"}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        if (template.config.dockerfile_content) {
+                                            setDockerfile(template.config.dockerfile_content);
+                                            setIsLoadModalOpen(false);
+                                            showToast("Template loaded successfully!", "success");
+                                        } else {
+                                            showToast("This template has no Dockerfile content.", "error");
+                                        }
+                                    }}
+                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 shadow-lg shadow-blue-500/20"
+                                >
+                                    <Upload size={12} /> Load
+                                </button>
+                             </div>
+                        ))
+                    )}
+                </div>
+
+                <div className="p-4 border-t border-[#3f3f46] bg-[#27272a]/50 flex justify-end">
+                    <button
+                        onClick={() => setIsLoadModalOpen(false)}
+                        className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-[#3f3f46] transition-colors"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 }

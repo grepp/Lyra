@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime
 
@@ -16,6 +16,7 @@ class EnvironmentBase(BaseModel):
     root_password: str = "admin"
     dockerfile_content: Optional[str] = None
     mount_config: List[MountConfig] = []
+    gpu_count: int = 0
 
 
 class EnvironmentCreate(EnvironmentBase):
@@ -45,5 +46,23 @@ class SettingUpdate(BaseModel):
 
 
 class SettingResponse(SettingBase):
+    class Config:
+        from_attributes = True
+
+
+class TemplateBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    config: Dict[str, Any]
+
+
+class TemplateCreate(TemplateBase):
+    pass
+
+
+class TemplateResponse(TemplateBase):
+    id: UUID
+    created_at: datetime
+
     class Config:
         from_attributes = True

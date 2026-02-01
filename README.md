@@ -61,3 +61,16 @@ You can manually run all checks across the codebase:
 ```bash
 pre-commit run --all-files
 ```
+
+### Database Migrations
+This project uses **Alembic** for handling database schema changes.
+
+**Create a new migration** (after modifying `models.py`):
+```bash
+docker compose exec backend alembic revision --autogenerate -m "Description of changes"
+```
+
+**Apply migrations to DB**:
+```bash
+docker compose exec backend alembic upgrade head
+```

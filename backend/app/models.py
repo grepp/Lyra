@@ -25,9 +25,11 @@ class Environment(Base):
 class Template(Base):
     __tablename__ = "templates"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String(100), nullable=False)
-    content = Column(Text, nullable=False)
+    description = Column(Text, nullable=True)
+    config = Column(JSONB, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class Setting(Base):

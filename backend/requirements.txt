@@ -5,7 +5,7 @@ asyncpg
 celery
 redis
 docker
-pynvml
+nvidia-ml-py
 python-multipart
 websockets
 psycopg2-binary
@@ -13,3 +13,4 @@ pytest
 httpx
 ptyprocess
 paramiko
+alembic

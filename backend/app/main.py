@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base
-from .routers import environments, terminal, resources, settings
+from .routers import environments, terminal, resources, settings, templates
 from .models import Setting
 from sqlalchemy.future import select
 from contextlib import asynccontextmanager
@@ -56,3 +56,4 @@ app.include_router(environments.router, prefix="/api")
 app.include_router(terminal.router, prefix="/api")
 app.include_router(resources.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
+app.include_router(templates.router, prefix="/api")

@@ -111,7 +111,7 @@ export default function Dashboard() {
                                     {env.ssh_port} / {env.jupyter_port}
                                 </td>
                                 <td className="px-6 py-4 text-gray-300">
-                                    {env.gpu_indices.map(idx => `GPU ${idx}`).join(', ')}
+                                    {env.gpu_indices.length > 0 ? env.gpu_indices.join(', ') : "-"}
                                 </td>
                                 <td className="px-6 py-4 text-right space-x-2">
                                     <button

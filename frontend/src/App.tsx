@@ -7,9 +7,12 @@ import Settings from './pages/Settings';
 import Templates from './pages/Templates';
 import TerminalPage from './pages/TerminalPage';
 
+import { ToastProvider } from './context/ToastContext';
+
 function App() {
   return (
     <AppProvider>
+      <ToastProvider>
       <Router>
       <div className="flex h-screen overflow-hidden bg-[#18181b] text-white font-sans">
         <Sidebar />
@@ -24,6 +27,7 @@ function App() {
         </main>
       </div>
       </Router>
+      </ToastProvider>
     </AppProvider>
   );
 }

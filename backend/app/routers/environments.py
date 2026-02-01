@@ -22,7 +22,41 @@ async def create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(
     # Mock allocation (In real logic, we should scan available ports)
     # Using random ports to avoid conflict for demo
     import random
-    mock_gpu_indices = [0]
+    import pynvml
+
+    # Real GPU Allocation Logic
+    gpu_indices = []
+    if env.gpu_count > 0:
+        total_gpus = 0
+        try:
+            pynvml.nvmlInit()
+            total_gpus = pynvml.nvmlDeviceGetCount()
+            pynvml.nvmlShutdown()
+        except Exception:
+            # If NVML fails, assume 0 or handle accordingly
+            raise HTTPException(status_code=500, detail="Failed to detect GPUs on host")
+
+        # Find currently used GPUs
+        result = await db.execute(select(Environment).where(Environment.status.in_(["running", "building"])))
+        active_envs = result.scalars().all()
+        used_indices = set()
+        for active in active_envs:
+            if active.gpu_indices:
+                used_indices.update(active.gpu_indices)
+
+        # Find available indices
+        available_indices = [i for i in range(total_gpus) if i not in used_indices]
+
+        if len(available_indices) < env.gpu_count:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Not enough GPUs available. Requested: {env.gpu_count}, Available: {len(available_indices)}"
+            )
+
+        # Allocate
+        gpu_indices = available_indices[:env.gpu_count]
+
+    mock_gpu_indices = gpu_indices
     mock_ssh_port = random.randint(20000, 25000)
     mock_jupyter_port = random.randint(25001, 30000)
     mock_code_port = random.randint(30001, 35000)
