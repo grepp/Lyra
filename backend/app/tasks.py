@@ -5,52 +5,53 @@ from sqlalchemy.orm import sessionmaker
 from .models import Environment
 import docker
 import time
-import json
+
 
 # Sync database setup for Celery
-# Replace 'postgresql+asyncpg' with 'postgresql' for sync driver if needed, 
+# Replace 'postgresql+asyncpg' with 'postgresql' for sync driver if needed,
 # but usually we use a separate sync URL string.
 SYNC_DATABASE_URL = DATABASE_URL.replace("postgresql+asyncpg", "postgresql")
 engine = create_engine(SYNC_DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 
+
 @celery_app.task(bind=True)
 def create_environment_task(self, environment_id):
     db = SessionLocal()
     env = db.query(Environment).filter(Environment.id == environment_id).first()
-    
+
     if not env:
         return f"Environment {environment_id} not found"
-        
+
     try:
         # Update status to building
         env.status = "building"
         db.commit()
-        
+
         client = docker.from_env()
-        
+
         # 1. Build Image (Mocking build process or using actual content)
         # In real app, write dockerfile_content to a temp folder and build
-        image_tag = f"gpuvibe-env-{str(env.id)}"
-        
+        # image_tag = f"gpuvibe-env-{str(env.id)}"
+
         # detailed implementation omitted for brevity, simulating build delay
-        time.sleep(5) 
-        
+        time.sleep(5)
+
         # 2. Run Container
         # For demo purposes, we use python:3.11-slim directly instead of building custom image
         # This speeds up the process and avoids complex build errors in this environment
         image_name = "python:3.11-slim"
-        
+
         # Pull image if not exists
         try:
-             client.images.get(image_name)
+            client.images.get(image_name)
         except docker.errors.ImageNotFound:
-             client.images.pull(image_name)
+            client.images.pull(image_name)
 
         # Basic container configuration
         container_config = {
             "image": image_name,
-            "name": f"gpuvibe-{env.name}-{env.id}", # Ensure unique name
+            "name": f"gpuvibe-{env.name}-{env.id}",  # Ensure unique name
             "detach": True,
             "ports": {
                 '22/tcp': env.ssh_port,
@@ -75,20 +76,20 @@ def create_environment_task(self, environment_id):
         # Add DeviceRequests if GPUs are requested and we are not mocking
         # In this Mac environment (no Nvidia), we skip device_requests if env.gpu_indices is empty or mock.
         # But if we want to simulate "claiming" them, we just don't pass them to docker if they don't exist.
-        
-        if env.gpu_indices:
-             # Only add if we are on a linux host with nvidia runtime, 
-             # otherwise this will fail on Mac. 
-             # We check client info or just Wrap in try-except for the run.
-             pass
 
-        container = client.containers.run(**container_config)
-        
+        if env.gpu_indices:
+            # Only add if we are on a linux host with nvidia runtime,
+            # otherwise this will fail on Mac.
+            # We check client info or just Wrap in try-except for the run.
+            pass
+
+        client.containers.run(**container_config)
+
         env.status = "running"
         db.commit()
-        
+
         return f"Environment {env.name} created successfully"
-        
+
     except Exception as e:
         env.status = "error"
         db.commit()

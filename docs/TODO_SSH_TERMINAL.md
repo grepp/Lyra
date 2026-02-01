@@ -3,7 +3,7 @@ description: Set up a comprehensive guide to implement SSH forwarding from the b
 ---
 # TODO: Implement SSH Forwarding for Terminal
 
-Currently, the terminal feature connects directly to the backend container's shell (`/bin/bash`). 
+Currently, the terminal feature connects directly to the backend container's shell (`/bin/bash`).
 The goal is to allow users to connect to:
 1. The **Host Machine** (where the app is running).
 2. The **Target Environments** (provisioned containers) via SSH.

@@ -1,7 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base
+from .routers import environments, terminal, resources
 import os
+
 
 app = FastAPI(title="GPU-VibeManager", version="0.1.0")
 
@@ -16,17 +18,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.on_event("startup")
 async def startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to GPU-VibeManager API"}
 
-# We will add routers here later
-from .routers import environments, terminal, resources
 
 app.include_router(environments.router)
 app.include_router(terminal.router)

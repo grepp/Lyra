@@ -1,0 +1,46 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-added-large-files
+
+  # Backend: Python
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        name: Backend Lint (flake8)
+        files: ^backend/
+        args: [--max-line-length=127, --extend-ignore=E203]
+
+  - repo: local
+    hooks:
+      - id: pytest
+        name: Backend Tests (pytest)
+        entry: bash -c "cd backend && export PYTHONPATH=$PYTHONPATH:. && python3 -m pytest"
+        language: system
+        types: [python]
+        pass_filenames: false
+        files: ^backend/
+
+  # Frontend: Node.js/React
+  - repo: local
+    hooks:
+      - id: frontend-lint
+        name: Frontend Lint (eslint)
+        entry: bash -c "cd frontend && npm run lint"
+        language: system
+        types_or: [ts, tsx, jsx, javascript]
+        pass_filenames: false
+        files: ^frontend/
+
+      - id: frontend-build
+        name: Frontend Type Check & Build
+        entry: bash -c "cd frontend && npm run build"
+        language: system
+        types_or: [ts, tsx, jsx, javascript, css, html]
+        pass_filenames: false
+        files: ^frontend/

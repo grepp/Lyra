@@ -1,12 +1,14 @@
-from pydantic import BaseModel, Field
-from typing import List, Optional, Any
+from pydantic import BaseModel
+from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
+
 
 class MountConfig(BaseModel):
     host_path: str
     container_path: str
     mode: str = "rw"
+
 
 class EnvironmentBase(BaseModel):
     name: str
@@ -15,8 +17,10 @@ class EnvironmentBase(BaseModel):
     dockerfile_content: Optional[str] = None
     mount_config: List[MountConfig] = []
 
+
 class EnvironmentCreate(EnvironmentBase):
     pass
+
 
 class EnvironmentResponse(EnvironmentBase):
     id: UUID
@@ -26,6 +30,6 @@ class EnvironmentResponse(EnvironmentBase):
     jupyter_port: int
     code_port: int
     created_at: datetime
-    
+
     class Config:
         from_attributes = True

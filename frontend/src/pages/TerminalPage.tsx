@@ -26,7 +26,7 @@ export default function TerminalPage() {
 
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
-    
+
     term.open(terminalRef.current);
     fitAddon.fit();
 
@@ -40,10 +40,10 @@ export default function TerminalPage() {
     // If running strictly in dev mode (port 5173 -> 8000), we might need localhost:8000 override.
     // However, if we serve via Nginx, relative is correct.
     // To support both:
-    const wsUrl = import.meta.env.DEV 
-        ? 'ws://localhost:8000/terminal/ws' 
+    const wsUrl = import.meta.env.DEV
+        ? 'ws://localhost:8000/terminal/ws'
         : `${protocol}//${window.location.host}/terminal/ws`;
-        
+
     const ws = new WebSocket(wsUrl);
     wsInstance.current = ws;
 
@@ -78,7 +78,7 @@ export default function TerminalPage() {
             ws.send(data);
         }
     });
-    
+
     // Handle Window Resize
     const handleResize = () => {
         fitAddon.fit();
@@ -86,7 +86,7 @@ export default function TerminalPage() {
              ws.send(`RESIZE:${term.rows},${term.cols}`);
         }
     };
-    
+
     window.addEventListener('resize', handleResize);
 
     return () => {

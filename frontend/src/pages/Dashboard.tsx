@@ -51,7 +51,7 @@ export default function Dashboard() {
 
   return (
     <div className="p-8 space-y-8 relative">
-      <Modal 
+      <Modal
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
         onConfirm={deleteEnvironment}
@@ -114,9 +114,9 @@ export default function Dashboard() {
                                     {env.gpu_indices.map(idx => `GPU ${idx}`).join(', ')}
                                 </td>
                                 <td className="px-6 py-4 text-right space-x-2">
-                                    <button 
+                                    <button
                                         onClick={() => setDeleteId(env.id)}
-                                        className="p-2 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-red-400 transition-colors" 
+                                        className="p-2 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-red-400 transition-colors"
                                         title="Delete"
                                     >
                                         <Trash2 size={18} />

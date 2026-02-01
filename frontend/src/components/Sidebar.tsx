@@ -29,8 +29,8 @@ export default function Sidebar() {
               to={item.path}
               className={clsx(
                 "flex items-center px-4 py-3 rounded-lg transition-all duration-200 group",
-                isActive 
-                  ? "bg-blue-600/10 text-blue-400" 
+                isActive
+                  ? "bg-blue-600/10 text-blue-400"
                   : "text-gray-400 hover:bg-[#27272a] hover:text-white"
               )}
             >
