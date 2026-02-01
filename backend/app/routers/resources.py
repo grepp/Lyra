@@ -25,10 +25,10 @@ async def get_gpu_resources():
             "used": 0
         }
     except Exception:
-        # Mocking 4 GPUs for demo
+        # Fallback to 0 if no drivers found
         return {
-            "available": 4,
-            "total": 4,
+            "available": 0,
+            "total": 0,
             "used": 0
         }
 
@@ -40,7 +40,7 @@ async def get_node_resources():
             "id": "node-1",
             "name": "Local Node",
             "status": "online",
-            "gpus": 4,
+            "gpus": 0,
             "load": random.randint(10, 80)
         }
     ]

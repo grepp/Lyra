@@ -77,7 +77,7 @@ async def delete_environment(environment_id: str, db: AsyncSession = Depends(get
     # Try to remove container
     try:
         client = docker.from_env()
-        container_name = f"gpuvibe-{env.name}-{env.id}"
+        container_name = f"lyra-{env.name}-{env.id}"
         try:
             container = client.containers.get(container_name)
             container.remove(force=True)

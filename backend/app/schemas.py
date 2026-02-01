@@ -33,3 +33,17 @@ class EnvironmentResponse(EnvironmentBase):
 
     class Config:
         from_attributes = True
+
+
+class SettingBase(BaseModel):
+    key: str
+    value: str
+
+
+class SettingUpdate(BaseModel):
+    value: str
+
+
+class SettingResponse(SettingBase):
+    class Config:
+        from_attributes = True

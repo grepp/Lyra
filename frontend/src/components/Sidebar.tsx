@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { FileCode, LayoutDashboard, PlusCircle, Settings, Terminal } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
+import { useApp } from '../context/AppContext';
 
 const navItems = [
   { name: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -12,12 +13,13 @@ const navItems = [
 
 export default function Sidebar() {
   const location = useLocation();
+  const { appName } = useApp();
 
   return (
     <div className="w-64 bg-[#18181b] border-r border-[#27272a] flex flex-col">
       <div className="p-6">
         <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
-          GPU-Vibe
+          {appName}
         </h1>
       </div>
       <nav className="flex-1 px-4 space-y-2">

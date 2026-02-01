@@ -3,11 +3,11 @@ version: '3.8'
 services:
   db:
     image: postgres:15-alpine
-    container_name: gpuvibe-db
+    container_name: lyra-db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: gpuvibe
+      POSTGRES_DB: lyra
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -16,21 +16,21 @@ services:
 
   redis:
     image: redis:alpine
-    container_name: gpuvibe-redis
+    container_name: lyra-redis
     ports:
       - "6379:6379"
     restart: always
 
   backend:
     build: ./backend
-    container_name: gpuvibe-backend
+    container_name: lyra-backend
     volumes:
       - ./backend:/app
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:password@db/gpuvibe
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@db/lyra
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - ALLOW_ORIGINS=http://localhost,http://localhost:5173,http://localhost:3000,http://0.0.0.0,http://127.0.0.1
@@ -41,13 +41,13 @@ services:
 
   worker:
     build: ./backend
-    container_name: gpuvibe-worker
+    container_name: lyra-worker
     command: celery -A app.worker worker --loglevel=info
     volumes:
       - ./backend:/app
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:password@db/gpuvibe
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@db/lyra
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
@@ -57,7 +57,7 @@ services:
 
   frontend:
     build: ./frontend
-    container_name: gpuvibe-frontend
+    container_name: lyra-frontend
     ports:
       - "80:80"
     depends_on:

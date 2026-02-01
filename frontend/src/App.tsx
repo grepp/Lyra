@@ -1,5 +1,6 @@
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
+import { AppProvider } from './context/AppContext';
 import Dashboard from './pages/Dashboard';
 import Provisioning from './pages/Provisioning';
 import Settings from './pages/Settings';
@@ -8,10 +9,11 @@ import TerminalPage from './pages/TerminalPage';
 
 function App() {
   return (
-    <Router>
-      <div className="flex h-screen bg-[#1e1e1e] text-white font-sans">
+    <AppProvider>
+      <Router>
+      <div className="flex h-screen overflow-hidden bg-[#18181b] text-white font-sans">
         <Sidebar />
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-auto overscroll-contain">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/provisioning" element={<Provisioning />} />
@@ -21,7 +23,8 @@ function App() {
           </Routes>
         </main>
       </div>
-    </Router>
+      </Router>
+    </AppProvider>
   );
 }
 

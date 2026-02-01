@@ -32,7 +32,7 @@ def create_environment_task(self, environment_id):
 
         # 1. Build Image (Mocking build process or using actual content)
         # In real app, write dockerfile_content to a temp folder and build
-        # image_tag = f"gpuvibe-env-{str(env.id)}"
+        # image_tag = f"lyra-env-{str(env.id)}"
 
         # detailed implementation omitted for brevity, simulating build delay
         time.sleep(5)
@@ -51,7 +51,7 @@ def create_environment_task(self, environment_id):
         # Basic container configuration
         container_config = {
             "image": image_name,
-            "name": f"gpuvibe-{env.name}-{env.id}",  # Ensure unique name
+            "name": f"lyra-{env.name}-{env.id}",  # Ensure unique name
             "detach": True,
             "ports": {
                 '22/tcp': env.ssh_port,

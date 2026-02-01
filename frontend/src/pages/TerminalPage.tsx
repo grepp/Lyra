@@ -97,17 +97,17 @@ export default function TerminalPage() {
   }, []);
 
   return (
-    <div className="h-full flex flex-col p-6 bg-[#18181b]">
-       <header className="mb-4 flex justify-between items-center">
-            <div>
-                 <h2 className="text-2xl font-bold text-white">Host Terminal</h2>
-                 <p className="text-gray-400 text-sm">Direct access to provider shell</p>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-gray-500">
-                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                Connected via WebSocket
-            </div>
-       </header>
+    <div className="p-8 h-full flex flex-col space-y-8 bg-[#18181b]">
+      <header className="flex justify-between items-center">
+        <div>
+          <h2 className="text-3xl font-bold text-white">Terminal</h2>
+          <p className="text-gray-400 mt-1">Direct access to provider shell</p>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+          Connected via WebSocket
+        </div>
+      </header>
        <div className="flex-1 bg-black rounded-xl border border-[#3f3f46] p-2 overflow-hidden shadow-2xl">
          <div ref={terminalRef} className="w-full h-full" />
        </div>
