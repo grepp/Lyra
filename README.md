@@ -15,10 +15,15 @@ Lyra is a web application designed to manage GPU-enabled build environments and 
 - Node.js 20+ (for local development)
 
 ### Running with Docker Compose
-To start the entire stack (Frontend, Backend, Database, Redis, and Worker):
 
+**Default (CPU-only):**
 ```bash
 docker-compose up -d --build
+```
+
+**With GPU Support (NVIDIA):**
+```bash
+docker-compose -f docker-compose.gpu.yml up -d --build
 ```
 
 - **Frontend**: [http://localhost](http://localhost)
