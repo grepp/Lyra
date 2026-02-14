@@ -2,6 +2,7 @@ import Editor from '@monaco-editor/react';
 import axios from 'axios';
 import { AlertCircle, Clock, Play, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 
@@ -16,6 +17,7 @@ interface Template {
 
 export default function Templates() {
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -47,8 +49,8 @@ export default function Templates() {
   const handleDeleteClick = (id: string, name: string) => {
       setModalConfig({
           isOpen: true,
-          title: 'Delete Template',
-          message: `Are you sure you want to delete "${name}"? This action cannot be undone.`,
+          title: t('templates.deleteTemplateTitle'),
+          message: t('templates.deleteTemplateMessage', { name }),
           type: 'confirm',
           onConfirm: () => handleDelete(id)
       });
@@ -91,7 +93,7 @@ export default function Templates() {
                         <h3 className="text-xl font-bold text-white">{selectedTemplate.name}</h3>
                         <div className="flex items-center gap-2 mt-2 text-sm text-gray-400">
                              <Clock size={14} />
-                             <span>Created {new Date(selectedTemplate.created_at).toLocaleString()}</span>
+                             <span>{t('templates.createdAt', { value: new Date(selectedTemplate.created_at).toLocaleString(i18n.language) })}</span>
                         </div>
                     </div>
                 </div>
@@ -99,7 +101,7 @@ export default function Templates() {
                 <div className="p-6 overflow-y-auto space-y-6">
                     {selectedTemplate.description && (
                          <div className="space-y-2">
-                            <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Description</h4>
+                            <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider">{t('templates.description')}</h4>
                             <p className="text-gray-300 bg-[#27272a]/50 p-3 rounded-lg border border-[#3f3f46]">
                                 {selectedTemplate.description}
                             </p>
@@ -110,7 +112,7 @@ export default function Templates() {
 
                         {selectedTemplate.config.dockerfile_content && (
                             <div className="space-y-2">
-                                <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider">Dockerfile</h4>
+                                <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider">{t('templates.dockerfile')}</h4>
                                 <div className="h-64 rounded-lg border border-[#3f3f46] overflow-hidden">
                                      <Editor
                                         height="100%"
@@ -137,13 +139,13 @@ export default function Templates() {
                         onClick={() => setSelectedTemplate(null)}
                         className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-[#3f3f46] transition-colors"
                     >
-                        Close
+                        {t('actions.close')}
                     </button>
                     <button
                         onClick={() => handleLoad(selectedTemplate)}
                         className="px-6 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20 transition-all flex items-center gap-2"
                     >
-                        <Play size={16} /> Load Template
+                        <Play size={16} /> {t('templates.loadTemplate')}
                     </button>
                 </div>
             </div>
@@ -151,14 +153,14 @@ export default function Templates() {
       )}
 
       <header>
-        <h2 className="text-3xl font-bold text-white tracking-tight">Templates</h2>
-        <p className="text-gray-400 mt-1">Manage your saved environment configurations.</p>
+        <h2 className="text-3xl font-bold text-white tracking-tight">{t('templates.title')}</h2>
+        <p className="text-gray-400 mt-1">{t('templates.subtitle')}</p>
       </header>
 
       {isLoading ? (
           <div className="text-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-              <p className="text-gray-400">Loading templates...</p>
+              <p className="text-gray-400">{t('templates.loadingTemplates')}</p>
           </div>
       ) : templates.length === 0 ? (
           <div className="bg-[#18181b] rounded-xl border border-[#27272a] p-12 text-center text-gray-400 flex flex-col items-center gap-4">
@@ -166,14 +168,14 @@ export default function Templates() {
                 <AlertCircle size={32} className="text-amber-500" />
             </div>
             <div>
-                <h3 className="text-lg font-semibold text-white mb-1">No Templates Found</h3>
-                <p>Save your favorite configurations in the Provisioning tab.</p>
+                <h3 className="text-lg font-semibold text-white mb-1">{t('templates.noTemplatesTitle')}</h3>
+                <p>{t('templates.noTemplatesMessage')}</p>
             </div>
             <button
                 onClick={() => navigate('/provisioning')}
                 className="mt-2 px-6 py-2 bg-[#27272a] hover:bg-[#3f3f46] text-white rounded-lg text-sm font-medium transition-colors"
             >
-                Go to Provisioning
+                {t('templates.goToProvisioning')}
             </button>
           </div>
       ) : (
@@ -188,7 +190,7 @@ export default function Templates() {
                         <h3 className="text-lg font-bold text-white truncate">{template.name}</h3>
                         <div className="flex items-center gap-1 text-xs text-gray-500 bg-[#27272a] px-2 py-0.5 rounded border border-[#3f3f46]">
                             <Clock size={10} />
-                            {new Date(template.created_at).toLocaleDateString()}
+                            {new Date(template.created_at).toLocaleDateString(i18n.language)}
                         </div>
                     </div>
                     <p className="text-sm text-gray-400 truncate mt-0.5">
@@ -202,12 +204,12 @@ export default function Templates() {
                       onClick={() => setSelectedTemplate(template)}
                       className="px-4 py-2 bg-[#27272a] hover:bg-[#3f3f46] border border-[#3f3f46] hover:border-gray-500/50 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-all"
                   >
-                      View
+                      {t('templates.view')}
                   </button>
                   <button
                       onClick={() => handleDeleteClick(template.id, template.name)}
                       className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                      title="Delete Template"
+                      title={t('templates.deleteTemplate')}
                   >
                       <Trash2 size={18} />
                   </button>

@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { AlertCircle, Lock, Settings as SettingsIcon, Unlock } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
@@ -8,6 +9,7 @@ import 'xterm/css/xterm.css';
 import { decrypt } from '../utils/crypto';
 
 export default function TerminalPage() {
+  const { t } = useTranslation();
   const terminalRef = useRef<HTMLDivElement>(null);
   const termInstance = useRef<Terminal | null>(null);
   const fitAddonInstance = useRef<FitAddon | null>(null);
@@ -84,21 +86,21 @@ export default function TerminalPage() {
     ws.binaryType = 'blob';
 
     ws.onopen = async () => {
-        term.write('\r\n\x1b[32m[Connected to Terminal Service]\x1b[0m\r\n');
+        term.write(`\r\n\x1b[32m${t('terminal.connectedService')}\x1b[0m\r\n`);
 
         let privateKey = '';
         if (authMethod === 'key') {
             const encrypted = localStorage.getItem('ssh_private_key_encrypted');
             if (!encrypted) {
-                term.write('\r\n\x1b[31m[Error: SSH Key not found in browser storage. Please select key in Settings.]\x1b[0m\r\n');
+                term.write(`\r\n\x1b[31m${t('terminal.errorKeyNotFound')}\x1b[0m\r\n`);
                 ws.close();
                 return;
             }
             try {
                 privateKey = await decrypt(encrypted, masterPassword);
-                term.write('\x1b[32m[Key Decrypted Successfully]\x1b[0m\r\n');
+                term.write(`\x1b[32m${t('terminal.keyDecrypted')}\x1b[0m\r\n`);
             } catch {
-                term.write('\r\n\x1b[31m[Decryption Failed: Invalid Passphrase]\x1b[0m\r\n');
+                term.write(`\r\n\x1b[31m${t('terminal.decryptFailed')}\x1b[0m\r\n`);
                 ws.close();
                 return;
             }
@@ -126,7 +128,7 @@ export default function TerminalPage() {
     };
 
     ws.onclose = () => {
-        term.write('\r\n\x1b[31m[Connection Closed]\x1b[0m\r\n');
+        term.write(`\r\n\x1b[31m${t('terminal.connectionClosed')}\x1b[0m\r\n`);
     };
 
     term.onData((data) => {
@@ -149,12 +151,12 @@ export default function TerminalPage() {
       ws.close();
       term.dispose();
     };
-  }, [isUnlocked, isConfigured, authMethod, masterPassword]);
+  }, [isUnlocked, isConfigured, authMethod, masterPassword, t]);
 
   const handleUnlock = (e: React.FormEvent) => {
     e.preventDefault();
     if (!masterPassword) {
-        setError('Please enter your master passphrase.');
+        setError(t('terminal.errorEnterMasterPassphrase'));
         return;
     }
     setError('');
@@ -173,8 +175,8 @@ export default function TerminalPage() {
       return (
           <div className="p-8 max-w-7xl mx-auto space-y-8 relative">
               <header>
-                  <h2 className="text-3xl font-bold text-white tracking-tight">Terminal</h2>
-                  <p className="text-gray-400 mt-1">Direct access to host shell via SSH</p>
+                  <h2 className="text-3xl font-bold text-white tracking-tight">{t('terminal.title')}</h2>
+                  <p className="text-gray-400 mt-1">{t('terminal.subtitle')}</p>
               </header>
 
               <div className="bg-[#18181b] rounded-xl border border-[#27272a] p-12 text-center text-gray-400 flex flex-col items-center gap-4">
@@ -182,15 +184,15 @@ export default function TerminalPage() {
                       <AlertCircle size={32} className="text-amber-500" />
                   </div>
                   <div>
-                      <h3 className="text-lg font-semibold text-white mb-1">Setup Required</h3>
-                      <p>Host server connection is not configured yet. Please provide SSH details in the settings.</p>
+                      <h3 className="text-lg font-semibold text-white mb-1">{t('terminal.setupRequiredTitle')}</h3>
+                      <p>{t('terminal.setupRequiredMessage')}</p>
                   </div>
                   <Link
                       to="/settings"
                       className="mt-2 px-6 py-2 bg-[#27272a] hover:bg-[#3f3f46] text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                   >
                       <SettingsIcon size={16} />
-                      Go to Settings
+                      {t('terminal.goToSettings')}
                   </Link>
               </div>
           </div>
@@ -205,8 +207,8 @@ export default function TerminalPage() {
                     <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-400 mb-2">
                         <Lock size={32} />
                     </div>
-                    <h2 className="text-2xl font-bold text-white">Terminal Locked</h2>
-                    <p className="text-gray-400">Enter your master passphrase to decrypt your SSH key and connect.</p>
+                    <h2 className="text-2xl font-bold text-white">{t('terminal.lockedTitle')}</h2>
+                    <p className="text-gray-400">{t('terminal.lockedMessage')}</p>
 
                     <form onSubmit={handleUnlock} className="w-full space-y-4 mt-6">
                         <div className="relative">
@@ -215,7 +217,7 @@ export default function TerminalPage() {
                                 autoFocus
                                 value={masterPassword}
                                 onChange={(e) => setMasterPassword(e.target.value)}
-                                placeholder="Master Passphrase"
+                                placeholder={t('terminal.masterPassphrasePlaceholder')}
                                 className="w-full bg-[#18181b] border border-[#3f3f46] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all pl-11"
                             />
                             <Unlock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -233,7 +235,7 @@ export default function TerminalPage() {
                             className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2"
                         >
                             <Unlock size={18} />
-                            Unlock & Connect
+                            {t('terminal.unlockConnect')}
                         </button>
                     </form>
                 </div>
@@ -246,12 +248,12 @@ export default function TerminalPage() {
     <div className="p-8 h-full flex flex-col space-y-8 bg-[#18181b]">
       <header className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold text-white">Terminal</h2>
-          <p className="text-gray-400 mt-1">Direct access to host shell via SSH</p>
+          <h2 className="text-3xl font-bold text-white">{t('terminal.title')}</h2>
+          <p className="text-gray-400 mt-1">{t('terminal.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2 text-xs text-gray-400 bg-[#27272a] px-3 py-1.5 rounded-full border border-[#3f3f46]">
           <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
-          Connected via WebSocket
+          {t('terminal.connectedViaWebsocket')}
         </div>
       </header>
        <div className="flex-1 bg-black rounded-xl border border-[#3f3f46] p-2 overflow-hidden shadow-2xl ring-1 ring-white/5">

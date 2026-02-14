@@ -337,21 +337,21 @@ export default function Settings() {
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">
       <div>
-        <h2 className="text-3xl font-bold text-white">Settings</h2>
-        <p className="text-gray-400 mt-1">Configure your application preferences and host access</p>
+        <h2 className="text-3xl font-bold text-white">{t('settings.title')}</h2>
+        <p className="text-gray-400 mt-1">{t('settings.subtitle')}</p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
         {/* Branding Section */}
         <section className="bg-[#27272a] rounded-xl border border-[#3f3f46] overflow-hidden shadow-xl">
           <div className="p-6 border-b border-[#3f3f46]">
-            <h3 className="text-xl font-semibold text-white flex items-center gap-2">General</h3>
-            <p className="text-sm text-gray-400 mt-1">Configure general application identifiers.</p>
+            <h3 className="text-xl font-semibold text-white flex items-center gap-2">{t('settings.generalTitle')}</h3>
+            <p className="text-sm text-gray-400 mt-1">{t('settings.generalDescription')}</p>
           </div>
 
           <form onSubmit={handleSaveName} className="p-6 space-y-4">
             <div>
-              <label htmlFor="appName" className="block text-sm font-medium text-gray-300 mb-2">Application Name</label>
+              <label htmlFor="appName" className="block text-sm font-medium text-gray-300 mb-2">{t('settings.applicationName')}</label>
               <div className="flex gap-4">
                 <input
                   id="appName"
@@ -366,11 +366,11 @@ export default function Settings() {
             </div>
 
             <div className="space-y-3 pt-2">
-              <label className="block text-sm font-medium text-gray-300">Favicon</label>
+              <label className="block text-sm font-medium text-gray-300">{t('settings.favicon')}</label>
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-lg border border-[#3f3f46] bg-[#18181b] flex items-center justify-center overflow-hidden">
                   {localFaviconDataUrl ? (
-                    <img src={localFaviconDataUrl} alt="Favicon preview" className="h-8 w-8 object-contain" />
+                    <img src={localFaviconDataUrl} alt={t('settings.faviconPreviewAlt')} className="h-8 w-8 object-contain" />
                   ) : (
                     <ImageIcon size={18} className="text-gray-500" />
                   )}
@@ -410,7 +410,7 @@ export default function Settings() {
                   </button>
                 </div>
               </div>
-              <p className="text-[11px] text-gray-500">Recommended: square icon (32x32 or 64x64), max 512KB.</p>
+              <p className="text-[11px] text-gray-500">{t('settings.faviconRecommended')}</p>
             </div>
 
             {appNameStatus.message && (
@@ -440,49 +440,49 @@ export default function Settings() {
         <section className="bg-[#27272a] rounded-xl border border-[#3f3f46] overflow-hidden shadow-xl">
           <div className="p-6 border-b border-[#3f3f46]">
             <h3 className="text-xl font-semibold text-white flex items-center gap-2">
-              <Server size={20} className="text-blue-400" /> Host Server Connection
+              <Server size={20} className="text-blue-400" /> {t('settings.hostServerTitle')}
             </h3>
-            <p className="text-sm text-gray-400 mt-1">Configure SSH access to the host machine for the Terminal tab.</p>
+            <p className="text-sm text-gray-400 mt-1">{t('settings.hostServerDescription')}</p>
           </div>
 
           <form onSubmit={handleSaveSsh} className="p-6 space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="col-span-1 sm:col-span-2 space-y-2">
-                <label className="text-sm font-medium text-gray-300">Host Address</label>
+                <label className="text-sm font-medium text-gray-300">{t('settings.hostAddress')}</label>
                 <div className="w-full bg-[#18181b]/50 border border-[#3f3f46] rounded-lg px-4 py-2.5 text-gray-400 text-sm flex items-center gap-2 overflow-hidden">
                   <Server size={14} /> {window.location.hostname}
-                  <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded ml-auto uppercase font-bold">Auto-detected</span>
+                  <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded ml-auto uppercase font-bold">{t('settings.autoDetected')}</span>
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">Port</label>
+                <label className="text-sm font-medium text-gray-300">{t('settings.port')}</label>
                 <input type="number" value={sshSettings.port} onChange={e => setSshSettings({...sshSettings, port: e.target.value})} className="w-full bg-[#18181b] border border-[#3f3f46] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">Username</label>
+                <label className="text-sm font-medium text-gray-300">{t('settings.username')}</label>
                 <input type="text" value={sshSettings.username} onChange={e => setSshSettings({...sshSettings, username: e.target.value})} className="w-full bg-[#18181b] border border-[#3f3f46] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500" />
               </div>
               <div className="col-span-1 sm:col-span-2 space-y-2">
-                <label className="text-sm font-medium text-gray-300">Authentication Method</label>
+                <label className="text-sm font-medium text-gray-300">{t('settings.authenticationMethod')}</label>
                 <div className="flex gap-4 p-1 bg-[#18181b] rounded-lg border border-[#3f3f46]">
-                  <button type="button" onClick={() => setSshSettings({...sshSettings, authMethod: 'password'})} className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${sshSettings.authMethod === 'password' ? 'bg-[#3f3f46] text-white' : 'text-gray-400'}`}>Password</button>
-                  <button type="button" onClick={() => setSshSettings({...sshSettings, authMethod: 'key'})} className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${sshSettings.authMethod === 'key' ? 'bg-[#3f3f46] text-white' : 'text-gray-400'}`}>SSH Key</button>
+                  <button type="button" onClick={() => setSshSettings({...sshSettings, authMethod: 'password'})} className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${sshSettings.authMethod === 'password' ? 'bg-[#3f3f46] text-white' : 'text-gray-400'}`}>{t('settings.password')}</button>
+                  <button type="button" onClick={() => setSshSettings({...sshSettings, authMethod: 'key'})} className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${sshSettings.authMethod === 'key' ? 'bg-[#3f3f46] text-white' : 'text-gray-400'}`}>{t('settings.sshKey')}</button>
                 </div>
               </div>
             </div>
 
             {sshSettings.authMethod === 'password' ? (
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300 flex items-center gap-2"><Lock size={14} /> Password</label>
+                <label className="text-sm font-medium text-gray-300 flex items-center gap-2"><Lock size={14} /> {t('settings.password')}</label>
                 <input type="password" value={sshSettings.password} onChange={e => setSshSettings({...sshSettings, password: e.target.value})} className="w-full bg-[#18181b] border border-[#3f3f46] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500" />
               </div>
             ) : (
               <div className="space-y-6">
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-300 flex items-center gap-2"><Key size={14} /> Private Key File</label>
+                    <label className="text-sm font-medium text-gray-300 flex items-center gap-2"><Key size={14} /> {t('settings.privateKeyFile')}</label>
                     <div className="flex gap-4 items-center">
                         <div className="flex-1 bg-[#18181b] border border-[#3f3f46] rounded-lg px-4 py-2.5 text-white font-mono text-sm overflow-hidden text-ellipsis whitespace-nowrap">
-                            {sshSettings.keyName || 'No file selected'}
+                            {sshSettings.keyName || t('settings.noFileSelected')}
                         </div>
                         <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
                         <button type="button" onClick={() => fileInputRef.current?.click()} className="bg-[#3f3f46] hover:bg-[#52525b] text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all">
@@ -491,9 +491,9 @@ export default function Settings() {
                     </div>
                 </div>
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-300 flex items-center gap-2"><Lock size={14} /> Master Passphrase</label>
-                    <input type="password" placeholder="Set password to encrypt the key in your browser" value={sshSettings.masterPassword} onChange={e => setSshSettings({...sshSettings, masterPassword: e.target.value})} className="w-full bg-[#18181b] border border-[#3f3f46] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500" />
-                    <p className="text-[10px] text-gray-500 mt-1">This passphrase is used locally only and never sent to the server.</p>
+                    <label className="text-sm font-medium text-gray-300 flex items-center gap-2"><Lock size={14} /> {t('settings.masterPassphrase')}</label>
+                    <input type="password" placeholder={t('settings.masterPassphrasePlaceholder')} value={sshSettings.masterPassword} onChange={e => setSshSettings({...sshSettings, masterPassword: e.target.value})} className="w-full bg-[#18181b] border border-[#3f3f46] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500" />
+                    <p className="text-[10px] text-gray-500 mt-1">{t('settings.masterPassphraseHelp')}</p>
                 </div>
               </div>
             )}
@@ -536,9 +536,9 @@ export default function Settings() {
         <div className="p-6 border-b border-[#3f3f46] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h3 className="text-xl font-semibold text-white flex items-center gap-2">
-              Resource Management
+              {t('settings.resourceManagementTitle')}
             </h3>
-            <p className="text-sm text-gray-400 mt-1">Cleanup only targets resources not referenced by any running or stopped container.</p>
+            <p className="text-sm text-gray-400 mt-1">{t('settings.resourceManagementDescription')}</p>
           </div>
           <button
             type="button"
@@ -553,20 +553,20 @@ export default function Settings() {
         <div className="p-6 grid grid-cols-1 xl:grid-cols-2 gap-6">
           <div className="bg-[#18181b] border border-[#3f3f46] rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
-            <h4 className="text-white font-medium">Unused Images</h4>
+            <h4 className="text-white font-medium">{t('settings.unusedImages')}</h4>
               <select
                 value={imageMode}
                 onChange={(e) => setImageMode(e.target.value as 'dangling' | 'unused')}
                 className="bg-[#27272a] border border-[#3f3f46] rounded-lg px-2 py-1 text-xs text-gray-200"
               >
-                <option value="dangling">Dangling Only</option>
-                <option value="unused">All Unused</option>
+                <option value="dangling">{t('settings.danglingOnly')}</option>
+                <option value="unused">{t('settings.allUnused')}</option>
               </select>
             </div>
-            <p className="text-xs text-gray-400">{unusedImages.length} candidate images</p>
+            <p className="text-xs text-gray-400">{t('settings.candidateImages', { count: unusedImages.length })}</p>
             <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
               {unusedImages.length === 0 ? (
-                <p className="text-xs text-gray-500">No removable images.</p>
+                <p className="text-xs text-gray-500">{t('settings.noRemovableImages')}</p>
               ) : unusedImages.map((img) => (
                 <div key={img.id} className="text-xs border border-[#3f3f46] rounded-lg p-2 text-gray-300">
                   <div className="font-mono text-[11px] text-gray-200">{img.short_id}</div>
@@ -586,12 +586,12 @@ export default function Settings() {
 
           <div className="bg-[#18181b] border border-[#3f3f46] rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-white font-medium flex items-center gap-2"><HardDrive size={15} /> Unused Volumes</h4>
-              <span className="text-xs text-gray-400">{unusedVolumes.length} candidates</span>
+              <h4 className="text-white font-medium flex items-center gap-2"><HardDrive size={15} /> {t('settings.unusedVolumes')}</h4>
+              <span className="text-xs text-gray-400">{t('settings.candidates', { count: unusedVolumes.length })}</span>
             </div>
             <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
               {unusedVolumes.length === 0 ? (
-                <p className="text-xs text-gray-500">No removable volumes.</p>
+                <p className="text-xs text-gray-500">{t('settings.noRemovableVolumes')}</p>
               ) : unusedVolumes.map((vol) => (
                 <label key={vol.name} className="flex items-start gap-2 text-xs border border-[#3f3f46] rounded-lg p-2 text-gray-300 cursor-pointer">
                   <input
@@ -621,9 +621,9 @@ export default function Settings() {
           </div>
 
           <div className="bg-[#18181b] border border-[#3f3f46] rounded-xl p-4 space-y-3">
-            <h4 className="text-white font-medium">Build Cache</h4>
-            <div className="text-sm text-gray-300">Entries: <span className="font-mono">{buildCache.count}</span></div>
-            <div className="text-sm text-gray-300">Size: <span className="font-mono">{formatBytes(buildCache.size)}</span></div>
+            <h4 className="text-white font-medium">{t('settings.buildCache')}</h4>
+            <div className="text-sm text-gray-300">{t('settings.entries')}: <span className="font-mono">{buildCache.count}</span></div>
+            <div className="text-sm text-gray-300">{t('settings.size')}: <span className="font-mono">{formatBytes(buildCache.size)}</span></div>
             <button
               type="button"
               onClick={runBuildCachePrune}
