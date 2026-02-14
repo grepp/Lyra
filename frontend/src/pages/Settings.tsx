@@ -3,6 +3,7 @@ import { AlertCircle, CheckCircle2, FolderOpen, HardDrive, ImageIcon, Key, Lock,
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 import { withApiMessage } from '../utils/i18nMessage';
 import { encrypt } from '../utils/crypto';
 
@@ -11,6 +12,7 @@ type StatusState = { type: 'idle' | 'loading' | 'success' | 'error'; message?: s
 export default function Settings() {
   const { appName, setAppName, faviconDataUrl, setFavicon, isLoading: appLoading } = useApp();
   const { t, i18n } = useTranslation();
+  const { theme, setTheme } = useTheme();
   const [localAppName, setLocalAppName] = useState(appName);
   const [localFaviconDataUrl, setLocalFaviconDataUrl] = useState(faviconDataUrl);
   const [appNameStatus, setAppNameStatus] = useState<StatusState>({ type: 'idle' });
@@ -354,21 +356,21 @@ export default function Settings() {
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">
       <div>
-        <h2 className="text-3xl font-bold text-white">{t('settings.title')}</h2>
-        <p className="text-gray-400 mt-1">{t('settings.subtitle')}</p>
+        <h2 className="text-3xl font-bold text-[var(--text)]">{t('settings.title')}</h2>
+        <p className="mt-1 text-[var(--text-muted)]">{t('settings.subtitle')}</p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
         {/* Branding Section */}
-        <section className="bg-[#27272a] rounded-xl border border-[#3f3f46] overflow-hidden shadow-xl">
-          <div className="p-6 border-b border-[#3f3f46]">
-            <h3 className="text-xl font-semibold text-white flex items-center gap-2">{t('settings.generalTitle')}</h3>
-            <p className="text-sm text-gray-400 mt-1">{t('settings.generalDescription')}</p>
+        <section className="rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] overflow-hidden shadow-xl">
+          <div className="p-6 border-b border-[var(--border)]">
+            <h3 className="text-xl font-semibold text-[var(--text)] flex items-center gap-2">{t('settings.generalTitle')}</h3>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">{t('settings.generalDescription')}</p>
           </div>
 
           <form onSubmit={handleSaveName} className="p-6 space-y-4">
             <div>
-              <label htmlFor="appName" className="block text-sm font-medium text-gray-300 mb-2">{t('settings.applicationName')}</label>
+              <label htmlFor="appName" className="mb-2 block text-sm font-medium text-[var(--text-muted)]">{t('settings.applicationName')}</label>
               <div className="flex gap-4">
                 <input
                   id="appName"
@@ -376,34 +378,52 @@ export default function Settings() {
                   value={localAppName}
                   onChange={(e) => setLocalAppName(e.target.value)}
                   disabled={isLoading}
-                  className="flex-1 bg-[#18181b] border border-[#3f3f46] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-all"
+                  className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-4 py-2.5 text-[var(--text)] transition-all focus:outline-none focus:border-blue-500"
                 />
                 <button type="submit" disabled={isLoading} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2"><Save size={18} />{t('actions.save')}</button>
               </div>
             </div>
 
             <div>
-              <label htmlFor="settings-language" className="block text-sm font-medium text-gray-300 mb-2">{t('settings.language')}</label>
-              <select
-                id="settings-language"
-                aria-label={t('settings.language')}
-                value={i18n.language}
-                onChange={(e) => handleLanguageChange((e.target.value as 'en' | 'ko'))}
-                className="w-full bg-[#18181b] border border-[#3f3f46] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-all"
-              >
-                <option value="en">{t('settings.languageEnglish')}</option>
-                <option value="ko">{t('settings.languageKorean')}</option>
-              </select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="settings-language" className="mb-2 block text-sm font-medium text-[var(--text-muted)]">{t('settings.language')}</label>
+                  <select
+                    id="settings-language"
+                    aria-label={t('settings.language')}
+                    value={i18n.language}
+                    onChange={(e) => handleLanguageChange((e.target.value as 'en' | 'ko'))}
+                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-4 py-2.5 text-[var(--text)] transition-all focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="en">{t('settings.languageEnglish')}</option>
+                    <option value="ko">{t('settings.languageKorean')}</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label htmlFor="settings-theme" className="mb-2 block text-sm font-medium text-[var(--text-muted)]">{t('settings.theme')}</label>
+                  <select
+                    id="settings-theme"
+                    aria-label={t('settings.theme')}
+                    value={theme}
+                    onChange={(e) => setTheme(e.target.value as 'light' | 'dark')}
+                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-4 py-2.5 text-[var(--text)] transition-all focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="dark">{t('settings.themeDark')}</option>
+                    <option value="light">{t('settings.themeLight')}</option>
+                  </select>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-3 pt-2">
-              <label className="block text-sm font-medium text-gray-300">{t('settings.favicon')}</label>
+              <label className="block text-sm font-medium text-[var(--text-muted)]">{t('settings.favicon')}</label>
               <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-lg border border-[#3f3f46] bg-[#18181b] flex items-center justify-center overflow-hidden">
+                <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg)]">
                   {localFaviconDataUrl ? (
                     <img src={localFaviconDataUrl} alt={t('settings.faviconPreviewAlt')} className="h-8 w-8 object-contain" />
                   ) : (
-                    <ImageIcon size={18} className="text-gray-500" />
+                    <ImageIcon size={18} className="text-[var(--text-muted)]" />
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -417,7 +437,7 @@ export default function Settings() {
                   <button
                     type="button"
                     onClick={() => faviconInputRef.current?.click()}
-                    className="bg-[#3f3f46] hover:bg-[#52525b] text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                    className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-4 py-2 text-sm font-medium text-[var(--text)] transition-all hover:brightness-95"
                   >
                     {t('actions.selectFile')}
                   </button>
@@ -434,14 +454,14 @@ export default function Settings() {
                     type="button"
                     onClick={handleResetFavicon}
                     disabled={isLoading}
-                    className="bg-[#3f3f46] hover:bg-[#52525b] text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm font-medium text-[var(--text)] transition-all hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Trash2 size={14} />
                     {t('actions.reset')}
                   </button>
                 </div>
               </div>
-              <p className="text-[11px] text-gray-500">{t('settings.faviconRecommended')}</p>
+              <p className="text-[11px] text-[var(--text-muted)]">{t('settings.faviconRecommended')}</p>
             </div>
 
             {appNameStatus.message && (
