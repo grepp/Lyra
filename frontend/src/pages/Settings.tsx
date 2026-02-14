@@ -362,7 +362,7 @@ export default function Settings() {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
         {/* Branding Section */}
-        <section className="rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] overflow-hidden shadow-xl">
+        <section className="rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] overflow-hidden">
           <div className="p-6 border-b border-[var(--border)]">
             <h3 className="text-xl font-semibold text-[var(--text)] flex items-center gap-2">{t('settings.generalTitle')}</h3>
             <p className="mt-1 text-sm text-[var(--text-muted)]">{t('settings.generalDescription')}</p>
@@ -488,7 +488,7 @@ export default function Settings() {
         </section>
 
         {/* SSH Connection Section */}
-        <section className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] overflow-hidden shadow-xl">
+        <section className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] overflow-hidden">
           <div className="p-6 border-b border-[var(--border)]">
             <h3 className="text-xl font-semibold text-[var(--text)] flex items-center gap-2">
               <Server size={20} className="text-blue-400" /> {t('settings.hostServerTitle')}
@@ -583,7 +583,7 @@ export default function Settings() {
         </section>
       </div>
 
-      <section className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] overflow-hidden shadow-xl">
+      <section className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] overflow-hidden">
         <div className="p-6 border-b border-[var(--border)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h3 className="text-xl font-semibold text-[var(--text)] flex items-center gap-2">

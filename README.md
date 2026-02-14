@@ -114,3 +114,66 @@ npm --prefix frontend run i18n:keys
 npm --prefix frontend run lint
 npm --prefix frontend run build
 ```
+
+---
+
+## Theme Guide
+
+### Theme Policy
+
+- Supported app themes: `dark`, `light`
+- Persisted key: `lyra.theme` (browser `localStorage`)
+- Default theme: `dark`
+- Terminal (`xterm`) is intentionally fixed to dark for readability/consistency
+
+### Theme Structure
+
+- Theme state/provider:
+  - `frontend/src/context/ThemeContext.tsx`
+- Global tokens:
+  - `frontend/src/index.css`
+  - Core tokens: `--bg`, `--bg-elevated`, `--surface`, `--border`, `--text`, `--text-muted`, `--primary`, `--danger`, `--success`, `--overlay`
+  - Terminal tokens: `--terminal-bg`, `--terminal-border`
+- App-level wiring:
+  - `frontend/src/main.tsx` (initial theme class apply)
+  - `frontend/src/App.tsx` (provider usage)
+
+### Third-Party Theming Rules
+
+- Monaco Editor (`@monaco-editor/react`)
+  - Use `vs-dark` when app theme is dark
+  - Use `vs` when app theme is light
+  - Applied in:
+    - `frontend/src/pages/Provisioning.tsx`
+    - `frontend/src/pages/Templates.tsx`
+- xterm
+  - Always dark theme (not bound to app light/dark toggle)
+  - Applied in:
+    - `frontend/src/pages/TerminalPage.tsx`
+
+---
+
+## Verification Checklist
+
+Run before opening a PR:
+
+```bash
+npm --prefix frontend run lint
+npm --prefix frontend run build
+```
+
+Manual checks:
+
+1. Toggle `Settings > General > Theme` (`dark`/`light`) and verify layout colors update on:
+   - Dashboard
+   - Provisioning
+   - Settings
+   - Templates
+2. Verify Monaco switches with app theme in:
+   - Provisioning Dockerfile editor
+   - Templates detail modal editor
+3. Verify Terminal page remains visually stable with fixed dark terminal area in both app themes.
+4. Verify key interactions remain unchanged:
+   - Environment create/start/stop/delete
+   - Template load/save/delete
+   - SSH settings save/test

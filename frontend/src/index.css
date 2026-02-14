@@ -7,11 +7,11 @@
 
 @layer base {
   :root {
-    --bg: #f5f5f7;
-    --bg-elevated: #ffffff;
-    --surface: #ffffff;
+    --bg: #e4e7ec;
+    --bg-elevated: #f7f8fb;
+    --surface: #eceff4;
     --overlay: rgb(15 23 42 / 0.38);
-    --border: #d4d4d8;
+    --border: #c9ced8;
     --text: #18181b;
     --text-muted: #52525b;
     --primary: #2563eb;
@@ -23,11 +23,11 @@
   }
 
   html.theme-dark {
-    --bg: #18181b;
-    --bg-elevated: #27272a;
-    --surface: #27272a;
+    --bg: #121316;
+    --bg-elevated: #23242b;
+    --surface: #1a1b20;
     --overlay: rgb(0 0 0 / 0.58);
-    --border: #3f3f46;
+    --border: #343743;
     --text: #ffffff;
     --text-muted: #a1a1aa;
     --primary: #3b82f6;
