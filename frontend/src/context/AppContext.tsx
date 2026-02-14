@@ -8,6 +8,8 @@ interface AppContextType {
   setAppName: (name: string) => Promise<void>;
   faviconDataUrl: string;
   setFavicon: (dataUrl: string) => Promise<void>;
+  announcementMarkdown: string;
+  setAnnouncementMarkdown: (markdown: string) => Promise<void>;
   isLoading: boolean;
   refreshSettings: () => Promise<void>;
 }
@@ -17,6 +19,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [appName, setAppNameState] = useState('Lyra');
   const [faviconDataUrl, setFaviconDataUrl] = useState('');
+  const [announcementMarkdown, setAnnouncementMarkdownState] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
   const applyFavicon = useCallback((url: string) => {
@@ -34,9 +37,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const fetchSettings = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [nameRes, faviconRes] = await Promise.allSettled([
+      const [nameRes, faviconRes, announcementRes] = await Promise.allSettled([
         axios.get('settings/app_name'),
         axios.get('settings/favicon_data_url'),
+        axios.get('settings/dashboard_announcement_markdown'),
       ]);
 
       if (nameRes.status === 'fulfilled' && nameRes.value.data?.value) {
@@ -47,8 +51,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         faviconRes.status === 'fulfilled' && faviconRes.value.data?.value
           ? String(faviconRes.value.data.value)
           : '';
+      const nextAnnouncement =
+        announcementRes.status === 'fulfilled' && announcementRes.value.data?.value
+          ? String(announcementRes.value.data.value)
+          : '';
 
       setFaviconDataUrl(nextFavicon);
+      setAnnouncementMarkdownState(nextAnnouncement);
       applyFavicon(nextFavicon);
     } catch (error) {
       console.error("Failed to fetch app settings", error);
@@ -69,6 +78,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     applyFavicon(dataUrl);
   };
 
+  const setAnnouncementMarkdown = async (markdown: string) => {
+    await axios.put('settings/dashboard_announcement_markdown', { value: markdown });
+    setAnnouncementMarkdownState(markdown);
+  };
+
   useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
@@ -82,7 +96,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [faviconDataUrl, applyFavicon]);
 
   return (
-    <AppContext.Provider value={{ appName, setAppName, faviconDataUrl, setFavicon, isLoading, refreshSettings: fetchSettings }}>
+    <AppContext.Provider
+      value={{
+        appName,
+        setAppName,
+        faviconDataUrl,
+        setFavicon,
+        announcementMarkdown,
+        setAnnouncementMarkdown,
+        isLoading,
+        refreshSettings: fetchSettings,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );

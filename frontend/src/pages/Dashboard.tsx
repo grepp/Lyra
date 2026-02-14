@@ -1,8 +1,11 @@
 import axios from 'axios';
-import { Code2, HardDrive, HelpCircle, LayoutTemplate, Network, Play, RefreshCw, Square, SquareTerminal, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Code2, HardDrive, HelpCircle, LayoutTemplate, Network, Play, RefreshCw, Square, SquareTerminal, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
 import Modal from '../components/Modal';
+import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 
 interface MountConfig {
@@ -36,6 +39,9 @@ const ENVS_CACHE_KEY = 'lyra.dashboard.environments';
 export default function Dashboard() {
   const { showToast } = useToast();
   const { t } = useTranslation();
+  const { announcementMarkdown } = useApp();
+  const hasAnnouncement = announcementMarkdown.trim().length > 0;
+  const [isNoticeOpen, setIsNoticeOpen] = useState(false);
   const [environments, setEnvironments] = useState<Environment[]>(() => {
     try {
       if (typeof window === 'undefined') return [];
@@ -196,6 +202,12 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (!hasAnnouncement) {
+      setIsNoticeOpen(false);
+    }
+  }, [hasAnnouncement, announcementMarkdown]);
+
   return (
     <div className="p-8 space-y-8 relative">
       <Modal
@@ -336,8 +348,53 @@ export default function Dashboard() {
         <div>
           <h2 className="text-3xl font-bold text-[var(--text)]">{t('dashboard.title')}</h2>
           <p className="text-[var(--text-muted)] mt-1">{t('dashboard.subtitle')}</p>
+        </div>
       </div>
-    </div>
+
+      {hasAnnouncement && (
+        <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] overflow-hidden">
+          <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
+            <h3 className="inline-flex items-start gap-2 text-xl font-bold text-[var(--text)]">
+              <span>{t('dashboard.noticeTitle')}</span>
+              <span className="mt-1.5 inline-block h-2 w-2 rounded-full bg-red-500" aria-hidden="true" />
+            </h3>
+            <button
+              type="button"
+              onClick={() => setIsNoticeOpen((prev) => !prev)}
+              className="rounded-lg border border-[var(--border)] bg-[var(--bg-soft)] p-2 text-[var(--text-muted)] transition-all hover:text-[var(--text)]"
+              title={isNoticeOpen ? t('dashboard.collapseNotice') : t('dashboard.expandNotice')}
+              aria-label={isNoticeOpen ? t('dashboard.collapseNotice') : t('dashboard.expandNotice')}
+            >
+              {isNoticeOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+          </div>
+
+          {isNoticeOpen && (
+            <div className="p-6">
+              <div className="text-sm text-[var(--text)] [&_a]:text-blue-500 [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-[var(--border)] [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-[var(--bg-soft)] [&_code]:px-1 [&_h1]:mt-4 [&_h1]:text-xl [&_h1]:font-semibold [&_h2]:mt-4 [&_h2]:text-lg [&_h2]:font-semibold [&_li]:ml-5 [&_li]:list-disc [&_p]:mt-2">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    a: ({ ...props }) => (
+                      <a {...props} target="_blank" rel="noopener noreferrer" />
+                    ),
+                    table: ({ ...props }) => (
+                      <div className="my-3 overflow-x-auto">
+                        <table {...props} className="w-full min-w-[420px] border-collapse text-left text-sm" />
+                      </div>
+                    ),
+                    thead: ({ ...props }) => <thead {...props} className="bg-[var(--bg-soft)]" />,
+                    th: ({ ...props }) => <th {...props} className="border border-[var(--border)] px-3 py-2 font-semibold text-[var(--text)]" />,
+                    td: ({ ...props }) => <td {...props} className="border border-[var(--border)] px-3 py-2 text-[var(--text)]" />,
+                  }}
+                >
+                  {announcementMarkdown}
+                </ReactMarkdown>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
 
       <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] overflow-hidden">

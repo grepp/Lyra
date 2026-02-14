@@ -35,7 +35,9 @@ Source: `frontend/package.json` + installed metadata in `frontend/node_modules`
 | react | 19.2.4 | MIT |
 | react-dom | 19.2.4 | MIT |
 | react-i18next | 16.5.4 | MIT |
+| react-markdown | 10.1.0 | MIT |
 | react-router-dom | 7.13.0 | MIT |
+| remark-gfm | 4.0.1 | MIT |
 | tailwind-merge | 3.4.0 | MIT |
 | tailwindcss | 4.1.18 | MIT |
 | typescript | 5.9.3 | Apache-2.0 |

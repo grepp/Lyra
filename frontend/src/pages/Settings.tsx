@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AlertCircle, CheckCircle2, FolderOpen, HardDrive, ImageIcon, Key, Lock, RefreshCw, Save, Server, Trash2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, FolderOpen, HardDrive, ImageIcon, Key, Lock, PencilLine, RefreshCw, Save, Server, Trash2, X } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
@@ -10,15 +10,26 @@ import { encrypt } from '../utils/crypto';
 type StatusState = { type: 'idle' | 'loading' | 'success' | 'error'; message?: string };
 
 export default function Settings() {
-  const { appName, setAppName, faviconDataUrl, setFavicon, isLoading: appLoading } = useApp();
+  const {
+    appName,
+    setAppName,
+    faviconDataUrl,
+    setFavicon,
+    announcementMarkdown,
+    setAnnouncementMarkdown,
+    isLoading: appLoading,
+  } = useApp();
   const { t, i18n } = useTranslation();
   const { theme, setTheme } = useTheme();
   const [localAppName, setLocalAppName] = useState(appName);
   const [localFaviconDataUrl, setLocalFaviconDataUrl] = useState(faviconDataUrl);
   const [appNameStatus, setAppNameStatus] = useState<StatusState>({ type: 'idle' });
   const [faviconStatus, setFaviconStatus] = useState<StatusState>({ type: 'idle' });
+  const [announcementStatus, setAnnouncementStatus] = useState<StatusState>({ type: 'idle' });
   const [sshStatus, setSshStatus] = useState<StatusState>({ type: 'idle' });
   const [resourceStatus, setResourceStatus] = useState<StatusState>({ type: 'idle' });
+  const [announcementEditorOpen, setAnnouncementEditorOpen] = useState(false);
+  const [announcementDraft, setAnnouncementDraft] = useState('');
 
   // SSH Settings State
   const [sshSettings, setSshSettings] = useState({
@@ -47,6 +58,10 @@ export default function Settings() {
   useEffect(() => {
     setLocalFaviconDataUrl(faviconDataUrl);
   }, [faviconDataUrl]);
+
+  useEffect(() => {
+    setAnnouncementDraft(announcementMarkdown);
+  }, [announcementMarkdown]);
 
   useEffect(() => {
     const fetchSshSettings = async () => {
@@ -176,6 +191,24 @@ export default function Settings() {
     } catch (error) {
       console.error(error);
       setFaviconStatus({ type: 'error', message: t('feedback.settings.faviconResetFailed') });
+    }
+  };
+
+  const openAnnouncementEditor = () => {
+    setAnnouncementDraft(announcementMarkdown);
+    setAnnouncementEditorOpen(true);
+  };
+
+  const handleSaveAnnouncement = async () => {
+    try {
+      setAnnouncementStatus({ type: 'loading' });
+      await setAnnouncementMarkdown(announcementDraft);
+      setAnnouncementStatus({ type: 'success', message: t('feedback.settings.announcementUpdated') });
+      setAnnouncementEditorOpen(false);
+      setTimeout(() => setAnnouncementStatus({ type: 'idle' }), 3000);
+    } catch (error) {
+      console.error(error);
+      setAnnouncementStatus({ type: 'error', message: t('feedback.settings.announcementUpdateFailed') });
     }
   };
 
@@ -371,6 +404,54 @@ export default function Settings() {
 
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">
+      {announcementEditorOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm">
+          <div className="w-full max-w-4xl overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[var(--border)] p-6">
+              <div>
+                <h3 className="text-lg font-bold text-[var(--text)]">{t('settings.announcementEditorTitle')}</h3>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">{t('settings.announcementEditorDescription')}</p>
+              </div>
+              <button
+                onClick={() => setAnnouncementEditorOpen(false)}
+                className="text-[var(--text-muted)] transition-colors hover:text-[var(--text)]"
+                aria-label={t('actions.close')}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <textarea
+                value={announcementDraft}
+                onChange={(e) => setAnnouncementDraft(e.target.value)}
+                placeholder={t('settings.announcementEditorPlaceholder')}
+                className={`h-[360px] w-full resize-y rounded-lg border border-[var(--border)] ${fieldBgClass} p-4 font-mono text-sm text-[var(--text)] focus:border-blue-500 focus:outline-none`}
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-[var(--border)] bg-[var(--bg-soft)] p-4">
+              <button
+                type="button"
+                onClick={() => setAnnouncementEditorOpen(false)}
+                className={secondaryButtonClass}
+                disabled={announcementStatus.type === 'loading'}
+              >
+                {t('actions.cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveAnnouncement}
+                className={primaryButtonClass}
+                disabled={announcementStatus.type === 'loading'}
+              >
+                {t('actions.save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <h2 className="text-3xl font-bold text-[var(--text)]">{t('settings.title')}</h2>
         <p className="mt-1 text-[var(--text-muted)]">{t('settings.subtitle')}</p>
@@ -483,6 +564,23 @@ export default function Settings() {
               <p className="text-[11px] text-[var(--text-muted)]">{t('settings.faviconRecommended')}</p>
             </div>
 
+            <div className="space-y-2 pt-2">
+              <label className="block text-sm font-medium text-[var(--text-muted)]">{t('settings.announcement')}</label>
+              <div className={`rounded-lg border border-[var(--border)] ${fieldBgClass} p-3 text-xs text-[var(--text-muted)]`}>
+                {announcementMarkdown.trim()
+                  ? t('settings.announcementConfigured')
+                  : t('settings.announcementEmpty')}
+              </div>
+              <button
+                type="button"
+                onClick={openAnnouncementEditor}
+                className={`${secondaryButtonClass} inline-flex items-center gap-2 py-2`}
+              >
+                <PencilLine size={14} />
+                {t('settings.editAnnouncement')}
+              </button>
+            </div>
+
             {appNameStatus.message && (
               <div className={`flex items-center gap-2 text-sm p-3 rounded-lg border ${
                 appNameStatus.type === 'success'
@@ -501,6 +599,22 @@ export default function Settings() {
               }`}>
                 {faviconStatus.type === 'success' ? <CheckCircle2 size={18} className="shrink-0" /> : <AlertCircle size={18} className="shrink-0" />}
                 <span className="font-medium">{faviconStatus.message}</span>
+              </div>
+            )}
+            {announcementStatus.message && (
+              <div className={`flex items-center gap-2 text-sm p-3 rounded-lg border ${
+                announcementStatus.type === 'success'
+                  ? 'text-green-400 bg-green-500/5 border-green-500/20'
+                  : announcementStatus.type === 'loading'
+                    ? 'text-blue-400 bg-blue-500/5 border-blue-500/20'
+                    : 'text-red-400 bg-red-500/5 border-red-500/20'
+              }`}>
+                {announcementStatus.type === 'success'
+                  ? <CheckCircle2 size={18} className="shrink-0" />
+                  : announcementStatus.type === 'loading'
+                    ? <RefreshCw size={18} className="shrink-0 animate-spin" />
+                    : <AlertCircle size={18} className="shrink-0" />}
+                <span className="font-medium">{announcementStatus.message}</span>
               </div>
             )}
           </form>
