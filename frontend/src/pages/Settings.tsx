@@ -3,6 +3,7 @@ import { AlertCircle, CheckCircle2, FolderOpen, HardDrive, ImageIcon, Key, Lock,
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
+import { withApiMessage } from '../utils/i18nMessage';
 import { encrypt } from '../utils/crypto';
 
 type StatusState = { type: 'idle' | 'loading' | 'success' | 'error'; message?: string };
@@ -98,11 +99,11 @@ export default function Settings() {
       setSelectedVolumes((prev) => prev.filter((name) => (volumesRes.data?.volumes || []).some((v: { name: string }) => v.name === name)));
     } catch (error) {
       console.error(error);
-      setResourceStatus({ type: 'error', message: 'Failed to load resource management data.' });
+      setResourceStatus({ type: 'error', message: t('feedback.settings.loadResourceDataFailed') });
     } finally {
       setIsResourceLoading(false);
     }
-  }, [imageMode]);
+  }, [imageMode, t]);
 
   useEffect(() => {
     loadResourceData(imageMode);
@@ -111,18 +112,18 @@ export default function Settings() {
   const handleSaveName = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!localAppName.trim()) {
-      setAppNameStatus({ type: 'error', message: 'Application name cannot be empty.' });
+      setAppNameStatus({ type: 'error', message: t('feedback.settings.appNameRequired') });
       return;
     }
 
     try {
       setAppNameStatus({ type: 'loading' });
       await setAppName(localAppName);
-      setAppNameStatus({ type: 'success', message: 'Application name updated successfully!' });
+      setAppNameStatus({ type: 'success', message: t('feedback.settings.appNameUpdated') });
       setTimeout(() => setAppNameStatus({ type: 'idle' }), 3000);
     } catch (error) {
       console.error(error);
-      setAppNameStatus({ type: 'error', message: 'Failed to update application name. Please try again.' });
+      setAppNameStatus({ type: 'error', message: t('feedback.settings.appNameUpdateFailed') });
     }
   };
 
@@ -131,12 +132,12 @@ export default function Settings() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      setFaviconStatus({ type: 'error', message: 'Please select an image file.' });
+      setFaviconStatus({ type: 'error', message: t('feedback.settings.faviconSelectImage') });
       return;
     }
 
     if (file.size > 512 * 1024) {
-      setFaviconStatus({ type: 'error', message: 'Favicon must be 512KB or smaller.' });
+      setFaviconStatus({ type: 'error', message: t('feedback.settings.faviconSizeLimit') });
       return;
     }
 
@@ -154,11 +155,11 @@ export default function Settings() {
     try {
       setFaviconStatus({ type: 'loading' });
       await setFavicon(localFaviconDataUrl);
-      setFaviconStatus({ type: 'success', message: 'Favicon updated successfully!' });
+      setFaviconStatus({ type: 'success', message: t('feedback.settings.faviconUpdated') });
       setTimeout(() => setFaviconStatus({ type: 'idle' }), 3000);
     } catch (error) {
       console.error(error);
-      setFaviconStatus({ type: 'error', message: 'Failed to update favicon.' });
+      setFaviconStatus({ type: 'error', message: t('feedback.settings.faviconUpdateFailed') });
     }
   };
 
@@ -168,11 +169,11 @@ export default function Settings() {
       setLocalFaviconDataUrl('');
       await setFavicon('');
       if (faviconInputRef.current) faviconInputRef.current.value = '';
-      setFaviconStatus({ type: 'success', message: 'Favicon reset to default.' });
+      setFaviconStatus({ type: 'success', message: t('feedback.settings.faviconReset') });
       setTimeout(() => setFaviconStatus({ type: 'idle' }), 3000);
     } catch (error) {
       console.error(error);
-      setFaviconStatus({ type: 'error', message: 'Failed to reset favicon.' });
+      setFaviconStatus({ type: 'error', message: t('feedback.settings.faviconResetFailed') });
     }
   };
 
@@ -196,7 +197,7 @@ export default function Settings() {
     e.preventDefault();
     try {
       if (!sshSettings.username.trim()) {
-        setSshStatus({ type: 'error', message: 'Username is required.' });
+        setSshStatus({ type: 'error', message: t('feedback.settings.sshUsernameRequired') });
         return;
       }
 
@@ -209,7 +210,7 @@ export default function Settings() {
 
       if (sshSettings.authMethod === 'password') {
         if (!sshSettings.password.trim()) {
-          setSshStatus({ type: 'error', message: 'Password is required.' });
+          setSshStatus({ type: 'error', message: t('feedback.settings.sshPasswordRequired') });
           return;
         }
         updates.push({ key: 'ssh_password', value: sshSettings.password });
@@ -219,14 +220,14 @@ export default function Settings() {
       if (sshSettings.authMethod === 'key') {
         if (sshSettings.privateKey) {
             if (!sshSettings.masterPassword) {
-                setSshStatus({ type: 'error', message: 'Master passphrase is required for encryption.' });
+                setSshStatus({ type: 'error', message: t('feedback.settings.sshMasterPassphraseRequired') });
                 return;
             }
             const encrypted = await encrypt(sshSettings.privateKey, sshSettings.masterPassword);
             localStorage.setItem('ssh_private_key_encrypted', encrypted);
             localStorage.setItem('ssh_key_name', sshSettings.keyName);
         } else if (!sshSettings.keyName) {
-            setSshStatus({ type: 'error', message: 'Please select an SSH key file.' });
+            setSshStatus({ type: 'error', message: t('feedback.settings.sshKeyFileRequired') });
             return;
         }
         // If they have keyName but no privateKey in state, it means they are using existing key
@@ -234,21 +235,21 @@ export default function Settings() {
 
       await Promise.all(updates.map(u => axios.put(`settings/${u.key}`, { value: u.value })));
 
-      setSshStatus({ type: 'success', message: 'SSH settings updated! Key is encrypted in your browser.' });
+      setSshStatus({ type: 'success', message: t('feedback.settings.sshSettingsUpdated') });
       setTimeout(() => setSshStatus({ type: 'idle' }), 3000);
     } catch (error) {
       console.error(error);
-      setSshStatus({ type: 'error', message: 'Failed to update SSH settings.' });
+      setSshStatus({ type: 'error', message: t('feedback.settings.sshSettingsUpdateFailed') });
     }
   };
 
   const handleTestSsh = async () => {
     try {
-      setSshStatus({ type: 'loading', message: 'Testing connection...' });
+      setSshStatus({ type: 'loading', message: t('feedback.settings.sshTesting') });
 
       const keyToTest = sshSettings.privateKey;
       if (sshSettings.authMethod === 'key' && !keyToTest) {
-          setSshStatus({ type: 'error', message: 'Please pick a key file to test.' });
+          setSshStatus({ type: 'error', message: t('feedback.settings.sshPickKeyToTest') });
           return;
       }
 
@@ -262,13 +263,13 @@ export default function Settings() {
       });
 
       if (res.data.status === 'success') {
-        setSshStatus({ type: 'success', message: 'Connection Successful!' });
+        setSshStatus({ type: 'success', message: t('feedback.settings.sshConnectionSuccess') });
       } else {
-        setSshStatus({ type: 'error', message: `Connection Failed: ${res.data.message}` });
+        setSshStatus({ type: 'error', message: withApiMessage(t, 'feedback.settings.sshConnectionFailed', res.data.message) });
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      setSshStatus({ type: 'error', message: `Test failed: ${message}` });
+      setSshStatus({ type: 'error', message: withApiMessage(t, 'feedback.settings.sshTestFailed', message) });
     }
   };
 
@@ -281,54 +282,62 @@ export default function Settings() {
 
   const runImagePrune = async () => {
     try {
-      setResourceStatus({ type: 'loading', message: 'Cleaning unused images...' });
+      setResourceStatus({ type: 'loading', message: t('feedback.settings.cleanupImagesRunning') });
       const res = await axios.post('resources/docker/images/prune', { mode: imageMode });
       setResourceStatus({
         type: 'success',
-        message: `Images cleaned: ${res.data?.removed_count || 0} removed, ${res.data?.skipped_count || 0} skipped.`,
+        message: t('feedback.settings.cleanupImagesResult', {
+          removed: Number(res.data?.removed_count || 0),
+          skipped: Number(res.data?.skipped_count || 0),
+        }),
       });
       await loadResourceData(imageMode);
       setTimeout(() => setResourceStatus({ type: 'idle' }), 3000);
     } catch (error) {
       console.error(error);
-      setResourceStatus({ type: 'error', message: 'Failed to clean images.' });
+      setResourceStatus({ type: 'error', message: t('feedback.settings.cleanupImagesFailed') });
     }
   };
 
   const runVolumePrune = async () => {
     if (selectedVolumes.length === 0) {
-      setResourceStatus({ type: 'error', message: 'Select at least one unused volume.' });
+      setResourceStatus({ type: 'error', message: t('feedback.settings.selectUnusedVolume') });
       return;
     }
     try {
-      setResourceStatus({ type: 'loading', message: 'Removing selected volumes...' });
+      setResourceStatus({ type: 'loading', message: t('feedback.settings.cleanupVolumesRunning') });
       const res = await axios.post('resources/docker/volumes/prune', { volume_names: selectedVolumes });
       setResourceStatus({
         type: 'success',
-        message: `Volumes removed: ${res.data?.removed_count || 0} removed, ${res.data?.skipped_count || 0} skipped.`,
+        message: t('feedback.settings.cleanupVolumesResult', {
+          removed: Number(res.data?.removed_count || 0),
+          skipped: Number(res.data?.skipped_count || 0),
+        }),
       });
       setSelectedVolumes([]);
       await loadResourceData(imageMode);
       setTimeout(() => setResourceStatus({ type: 'idle' }), 3000);
     } catch (error) {
       console.error(error);
-      setResourceStatus({ type: 'error', message: 'Failed to remove selected volumes.' });
+      setResourceStatus({ type: 'error', message: t('feedback.settings.cleanupVolumesFailed') });
     }
   };
 
   const runBuildCachePrune = async () => {
     try {
-      setResourceStatus({ type: 'loading', message: 'Cleaning build cache...' });
+      setResourceStatus({ type: 'loading', message: t('feedback.settings.cleanupBuildCacheRunning') });
       const res = await axios.post('resources/docker/build-cache/prune', { all: true });
       setResourceStatus({
         type: 'success',
-        message: `Build cache cleaned. Reclaimed ${formatBytes(Number(res.data?.space_reclaimed || 0))}.`,
+        message: t('feedback.settings.cleanupBuildCacheResult', {
+          size: formatBytes(Number(res.data?.space_reclaimed || 0)),
+        }),
       });
       await loadResourceData(imageMode);
       setTimeout(() => setResourceStatus({ type: 'idle' }), 3000);
     } catch (error) {
       console.error(error);
-      setResourceStatus({ type: 'error', message: 'Failed to clean build cache.' });
+      setResourceStatus({ type: 'error', message: t('feedback.settings.cleanupBuildCacheFailed') });
     }
   };
 

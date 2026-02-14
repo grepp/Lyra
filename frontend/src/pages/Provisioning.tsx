@@ -112,10 +112,10 @@ export default function Provisioning() {
       if (mappings.length > 0) {
         setCustomPorts((prev) => [...prev, mappings[0]]);
       } else {
-        showToast(t('provisioning.errorAllocateCustomPort'), 'error');
+        showToast(t('feedback.provisioning.allocateCustomPortFailed'), 'error');
       }
     } catch {
-      showToast(t('provisioning.errorAllocateCustomPort'), 'error');
+      showToast(t('feedback.provisioning.allocateCustomPortFailed'), 'error');
     } finally {
       setIsAllocatingPort(false);
     }
@@ -164,7 +164,7 @@ export default function Provisioning() {
       navigate('/');
     } catch (error) {
       console.error("Failed to create environment", error);
-      showAlert(t('provisioning.creationFailedTitle'), t('provisioning.creationFailedMessage'));
+      showAlert(t('feedback.provisioning.creationFailedTitle'), t('feedback.provisioning.creationFailedMessage'));
     }
   };
 
@@ -196,10 +196,10 @@ export default function Provisioning() {
           setIsSaveModalOpen(false);
           setTemplateName('');
           setTemplateDesc('');
-          showToast(t('provisioning.templateSaved'), "success");
+          showToast(t('feedback.provisioning.templateSaved'), "success");
       } catch (error) {
           console.error("Failed to save template", error);
-          showToast(t('provisioning.templateSaveFailed'), "error");
+          showToast(t('feedback.provisioning.templateSaveFailed'), "error");
       }
   };
 
@@ -616,9 +616,9 @@ export default function Provisioning() {
                                         if (template.config.dockerfile_content) {
                                             setDockerfile(template.config.dockerfile_content);
                                             setIsLoadModalOpen(false);
-                                            showToast(t('provisioning.templateLoaded'), "success");
+                                            showToast(t('feedback.provisioning.templateLoaded'), "success");
                                         } else {
-                                            showToast(t('provisioning.templateDockerfileMissing'), "error");
+                                            showToast(t('feedback.provisioning.templateDockerfileMissing'), "error");
                                         }
                                     }}
                                     className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 shadow-lg shadow-blue-500/20"

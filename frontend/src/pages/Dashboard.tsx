@@ -153,9 +153,9 @@ export default function Dashboard() {
   const copySshCommand = async (sshCommand: string) => {
     try {
       await navigator.clipboard.writeText(sshCommand);
-      showToast(t('dashboard.sshCopied'), 'success');
+      showToast(t('feedback.dashboard.sshCopied'), 'success');
     } catch {
-      showToast(t('dashboard.copyFailedRunManually', { command: sshCommand }), 'error');
+      showToast(t('feedback.dashboard.copyFailedRunManually', { command: sshCommand }), 'error');
     }
   };
 
@@ -171,13 +171,13 @@ export default function Dashboard() {
       const res = await axios.post(`environments/${env.id}/jupyter/launch`);
       const launchUrl = String(res.data.launch_url || '');
       if (!launchUrl) {
-        showToast(t('dashboard.jupyterLaunchUrlMissing'), 'error');
+        showToast(t('feedback.dashboard.jupyterLaunchUrlMissing'), 'error');
         return;
       }
       const targetUrl = launchUrl.startsWith('http') ? launchUrl : `${window.location.origin}${launchUrl}`;
       window.open(targetUrl, '_blank', 'noopener,noreferrer');
     } catch {
-      showToast(t('dashboard.jupyterOpenFailed'), 'error');
+      showToast(t('feedback.dashboard.jupyterOpenFailed'), 'error');
     }
   };
 
