@@ -31,6 +31,7 @@ class EnvironmentResponse(EnvironmentBase):
     jupyter_port: int
     code_port: int
     created_at: datetime
+    container_id: str | None = None
 
     class Config:
         from_attributes = True

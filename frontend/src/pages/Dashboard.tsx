@@ -14,30 +14,64 @@ interface Environment {
   name: string;
   status: string;
   gpu_indices: number[];
+  container_id?: string;
   ssh_port: number;
   jupyter_port: number;
   created_at: string;
   mount_config: MountConfig[];
 }
 
+const ENVS_CACHE_KEY = 'lyra.dashboard.environments';
+
 export default function Dashboard() {
-  const [environments, setEnvironments] = useState<Environment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [environments, setEnvironments] = useState<Environment[]>(() => {
+    try {
+      if (typeof window === 'undefined') return [];
+      const cached = window.localStorage.getItem(ENVS_CACHE_KEY);
+      if (!cached) return [];
+      return JSON.parse(cached) as Environment[];
+    } catch {
+      return [];
+    }
+  });
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const cached = window.localStorage.getItem(ENVS_CACHE_KEY);
+    return !cached;
+  });
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return Boolean(window.localStorage.getItem(ENVS_CACHE_KEY));
+  });
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [selectedVolEnv, setSelectedVolEnv] = useState<Environment | null>(null);
   const [errorLogEnv, setErrorLogEnv] = useState<Environment | null>(null);
   const [errorLog, setErrorLog] = useState<string>("");
   const [logLoading, setLogLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
 
-  const fetchEnvironments = async () => {
-    try {
+  const fetchEnvironments = async (options: { showLoading?: boolean } = {}) => {
+    const { showLoading = false } = options;
+
+    if (showLoading) {
       setLoading(true);
+    }
+
+    try {
       const res = await axios.get('environments/');
       setEnvironments(res.data);
+      setHasLoadedOnce(true);
+      try {
+        window.localStorage.setItem(ENVS_CACHE_KEY, JSON.stringify(res.data));
+      } catch {
+        // Ignore cache write failures
+      }
     } catch (error) {
       console.error("Failed to fetch environments", error);
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
@@ -74,9 +108,35 @@ export default function Dashboard() {
     setDeleteId(null);
   };
 
+  const withActionLoading = async (environmentId: string, action: () => Promise<void>) => {
+    setActionLoading((prev) => ({ ...prev, [environmentId]: true }));
+    try {
+      await action();
+    } catch (error) {
+      console.error("Failed to change environment state", error);
+    } finally {
+      await fetchEnvironments();
+      setActionLoading((prev) => ({ ...prev, [environmentId]: false }));
+    }
+  };
+
+  const startEnvironment = async (env: Environment) => {
+    await withActionLoading(env.id, async () => {
+      await axios.post(`environments/${env.id}/start`);
+    });
+  };
+
+  const stopEnvironment = async (env: Environment) => {
+    await withActionLoading(env.id, async () => {
+      await axios.post(`environments/${env.id}/stop`);
+    });
+  };
+
   useEffect(() => {
-    fetchEnvironments();
-    const interval = setInterval(fetchEnvironments, 5000);
+    fetchEnvironments({ showLoading: true });
+    const interval = setInterval(() => {
+      fetchEnvironments();
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -190,12 +250,15 @@ export default function Dashboard() {
       <div className="bg-[#27272a] rounded-xl border border-[#3f3f46] overflow-hidden">
         <div className="p-6 border-b border-[#3f3f46] flex justify-between items-center">
             <h3 className="text-xl font-bold text-white">Instances</h3>
-            <button onClick={fetchEnvironments} className="p-2 hover:bg-[#3f3f46] rounded-full text-gray-400 transition-colors">
-                <RefreshCw size={18} className={loading && environments.length > 0 ? "animate-spin" : ""} />
+            <button
+              onClick={() => fetchEnvironments({ showLoading: true })}
+              className="p-2 hover:bg-[#3f3f46] rounded-full text-gray-400 transition-colors"
+            >
+                <RefreshCw size={18} className={loading && hasLoadedOnce ? "animate-spin" : ""} />
             </button>
         </div>
         <div className="w-full text-left">
-            {loading && environments.length === 0 ? (
+            {!hasLoadedOnce && loading ? (
                  <div className="p-8 text-center text-gray-500">Loading environments...</div>
             ) : environments.length === 0 ? (
                  <div className="p-8 text-center text-gray-500">No environments found.</div>
@@ -211,18 +274,33 @@ export default function Dashboard() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-[#3f3f46]">
-                        {environments.map((env) => (
+                        {[...environments]
+                          .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
+                          .map((env) => (
                             <tr key={env.id} className="hover:bg-[#3f3f46]/50 transition-colors">
-                                <td className="px-6 py-4 text-white font-medium">{env.name}</td>
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-white font-medium">{env.name}</span>
+                                    <span className="text-sm text-gray-500">({env.container_id || env.id.slice(0, 12)})</span>
+                                  </div>
+                                </td>
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-2">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                            env.status === 'running' ? 'bg-green-500/10 text-green-500' :
-                                            env.status === 'stopped' ? 'bg-yellow-500/10 text-yellow-500' :
-                                            env.status === 'building' ? 'bg-blue-500/10 text-blue-500' :
-                                            'bg-red-500/10 text-red-500'
+                                            actionLoading[env.id]
+                                              ? (env.status === 'running'
+                                                ? 'bg-gray-500/10 text-gray-400'
+                                                : 'bg-gray-500/10 text-gray-400')
+                                              : env.status === 'running' ? 'bg-green-500/10 text-green-500' :
+                                                env.status === 'stopped' ? 'bg-yellow-500/10 text-yellow-500' :
+                                                env.status === 'building' ? 'bg-blue-500/10 text-blue-500' :
+                                                env.status === 'starting' ? 'bg-gray-500/10 text-gray-400' :
+                                                env.status === 'stopping' ? 'bg-gray-500/10 text-gray-400' :
+                                                'bg-red-500/10 text-red-500'
                                         }`}>
-                                            {env.status.charAt(0).toUpperCase() + env.status.slice(1)}
+                                            {actionLoading[env.id]
+                                              ? (env.status === 'running' ? "Stopping" : "Starting")
+                                              : (env.status.charAt(0).toUpperCase() + env.status.slice(1))}
                                         </span>
                                         {env.status === 'error' && (
                                             <button
@@ -262,21 +340,35 @@ export default function Dashboard() {
                                     {env.gpu_indices.length > 0 ? env.gpu_indices.join(', ') : "-"}
                                 </td>
                                 <td className="px-6 py-4 text-right space-x-2">
-                                    <button
-                                        onClick={() => {
-                                            // Toggle status locally for UI demo
-                                            const newStatus = env.status === 'running' ? 'stopped' : 'running';
-                                            setEnvironments(prev => prev.map(e => e.id === env.id ? { ...e, status: newStatus } : e));
-                                        }}
-                                        className={`p-2 rounded-lg transition-colors ${
-                                            env.status === 'running'
-                                            ? "hover:bg-[#3f3f46] text-gray-400 hover:text-yellow-400"
-                                            : "hover:bg-[#3f3f46] text-gray-400 hover:text-green-400"
-                                        }`}
-                                        title={env.status === 'running' ? "Stop Instance" : "Start Instance"}
-                                    >
-                                        {env.status === 'running' ? <Square size={18} fill="currentColor" className="opacity-80" /> : <Play size={18} fill="currentColor" />}
-                                    </button>
+                                    {(() => {
+                                        const isTransitioning = env.status === 'stopping' || env.status === 'starting';
+                                        const isRunning = env.status === 'running';
+                                        return (
+                                            <button
+                                                onClick={() => {
+                                                    if (isRunning) {
+                                                        stopEnvironment(env);
+                                                    } else {
+                                                        startEnvironment(env);
+                                                    }
+                                                }}
+                                                disabled={actionLoading[env.id] || isTransitioning}
+                                                className={`p-2 rounded-lg transition-colors ${
+                                                    isRunning
+                                                    ? "hover:bg-[#3f3f46] text-gray-400 hover:text-yellow-400"
+                                                    : "hover:bg-[#3f3f46] text-gray-400 hover:text-green-400"
+                                                } ${actionLoading[env.id] ? "animate-pulse opacity-80" : ""}`}
+                                                title={isRunning ? "Stop Instance" : "Start Instance"}
+                                            >
+                                                {actionLoading[env.id] || isTransitioning
+                                                    ? <RefreshCw size={18} className="animate-spin" />
+                                                    : isRunning
+                                                        ? <Square size={18} fill="currentColor" className="opacity-80" />
+                                                        : <Play size={18} fill="currentColor" />
+                                                }
+                                            </button>
+                                        );
+                                    })()}
                                     <button
                                         onClick={() => {
                                             if (env.mount_config && env.mount_config.length > 0) {

@@ -50,11 +50,11 @@ async def create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(
         if len(available_indices) < env.gpu_count:
             raise HTTPException(
                 status_code=400,
-                detail=f"Not enough GPUs available. Requested: {env.gpu_count}, Available: {len(available_indices)}"
+                detail=f"Not enough GPUs available. Requested: {env.gpu_count}, Available: {len(available_indices)}",
             )
 
         # Allocate
-        gpu_indices = available_indices[:env.gpu_count]
+        gpu_indices = available_indices[: env.gpu_count]
 
     mock_gpu_indices = gpu_indices
     mock_ssh_port = random.randint(20000, 25000)
@@ -73,7 +73,7 @@ async def create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(
         ssh_port=mock_ssh_port,
         jupyter_port=mock_jupyter_port,
         code_port=mock_code_port,
-        status="building"
+        status="building",
     )
 
     db.add(new_env)
@@ -91,48 +91,93 @@ async def read_environments(skip: int = 0, limit: int = 100, db: AsyncSession = 
     result = await db.execute(select(Environment).offset(skip).limit(limit))
     envs = result.scalars().all()
 
-    # Sync with Docker status
     client = docker.from_env()
     status_changed = False
+    env_responses = []
 
     for env in envs:
         container_name = f"lyra-{env.name}-{env.id}"
+        container_id: str | None = None
+
         try:
             container = client.containers.get(container_name)
+            container_id = container.short_id or (container.id[:12] if container.id else None)
+            state_info = container.attrs.get('State', {})
+            container_status = container.status
+            state_status = state_info.get('Status', '')
+            exit_code = state_info.get('ExitCode')
+            oom_killed = state_info.get('OOMKilled', False)
+            error_msg = state_info.get('Error', "")
 
-            # Check for error state (Exit Code != 0)
-            exit_code = container.attrs['State'].get('ExitCode', 0)
-
-            if container.status == 'running':
-                if env.status != 'running':
-                    env.status = 'running'
-                    status_changed = True
+            if container_status == 'running':
+                if env.status == 'starting':
+                    new_status = 'running'
+                elif env.status == 'stopping':
+                    new_status = 'stopping'
+                elif env.status != 'running':
+                    new_status = 'running'
+                else:
+                    new_status = env.status
             else:
-                # Container is not running
-                new_status = 'stopped'
-                if exit_code != 0:
-                    new_status = 'error'
+                if env.status == 'stopping':
+                    if state_status in ['created', 'restarting', 'starting']:
+                        new_status = 'stopping'
+                    elif exit_code is None:
+                        new_status = 'stopped'
+                    elif exit_code in [0, 143]:
+                        new_status = 'stopped'
+                    elif exit_code == 137:
+                        if oom_killed or str(error_msg).strip():
+                            new_status = 'error'
+                        else:
+                            new_status = 'stopped'
+                    else:
+                        new_status = 'error'
+                elif env.status == 'starting':
+                    if state_status in ['created', 'restarting', 'starting'] and exit_code is None:
+                        new_status = 'starting'
+                    elif exit_code is None:
+                        new_status = 'stopped'
+                    elif exit_code in [0, 143]:
+                        new_status = 'stopped'
+                    elif exit_code == 137:
+                        if oom_killed or str(error_msg).strip():
+                            new_status = 'error'
+                        else:
+                            new_status = 'stopped'
+                    else:
+                        new_status = 'error'
+                else:
+                    if exit_code is None:
+                        new_status = 'stopped'
+                    elif exit_code in [0, 143]:
+                        new_status = 'stopped'
+                    elif exit_code == 137:
+                        if oom_killed or str(error_msg).strip():
+                            new_status = 'error'
+                        else:
+                            new_status = 'stopped'
+                    else:
+                        new_status = 'error'
 
-                if env.status != new_status:
-                    env.status = new_status
-                    status_changed = True
+            if env.status != new_status:
+                env.status = new_status
+                status_changed = True
         except docker.errors.NotFound:
-            if env.status in ['running', 'building']:
-                # If it was supposed to be running/building but not found, mark as stopped or error
-                # Note: 'building' might be tricky if it's still in image build phase,
-                # but once container is expected, it should be there.
-                # For simplicity, if not found and was running, mark stopped.
-                if env.status == 'running':
-                    env.status = 'stopped'
-                    status_changed = True
+            if env.status in ['running', 'stopping', 'starting']:
+                env.status = 'stopped'
+                status_changed = True
         except Exception as e:
             print(f"Error checking container status: {e}")
 
+        env_dict = {**env.__dict__, "container_id": container_id}
+        env_dict.pop("_sa_instance_state", None)
+        env_responses.append(env_dict)
+
     if status_changed:
         await db.commit()
-        # Re-fetch or just return updated objects (SQLAlchemy objects act as refs)
 
-    return envs
+    return env_responses
 
 
 @router.get("/{environment_id}", response_model=EnvironmentResponse)
@@ -157,10 +202,28 @@ async def get_environment_logs(environment_id: str, db: AsyncSession = Depends(g
     try:
         # Check if container exists (even if stopped/exited)
         container = client.containers.get(container_name)
-        logs = container.logs(tail=50).decode('utf-8')
-        return {"logs": logs}
+        logs = container.logs(tail=50)
+        logs_text = logs.decode('utf-8').strip() if logs else ""
+
+        if not logs_text:
+            state = container.attrs.get('State', {})
+            exit_code = state.get('ExitCode')
+            error_msg = state.get('Error', "")
+
+            if error_msg:
+                return {"logs": error_msg}
+            if exit_code is not None:
+                return {"logs": f"Container exited with code: {exit_code}, but no logs were produced."}
+
+            return {"logs": "No logs produced by this container."}
+
+        return {"logs": logs_text}
     except docker.errors.NotFound:
-        raise HTTPException(status_code=404, detail="Container not found")
+        if env.status == "error":
+            return {
+                "logs": "No container was created for this environment. Build may have failed before container start. Check backend worker logs for the full build error."  # noqa: E501
+            }
+        return {"logs": "Container not found. It may have been removed or not started yet."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -188,3 +251,67 @@ async def delete_environment(environment_id: str, db: AsyncSession = Depends(get
     await db.commit()
 
     return None
+
+
+@router.post("/{environment_id}/start", status_code=status.HTTP_200_OK)
+async def start_environment(environment_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Environment).where(Environment.id == environment_id))
+    env = result.scalars().first()
+    if env is None:
+        raise HTTPException(status_code=404, detail="Environment not found")
+
+    container_name = f"lyra-{env.name}-{env.id}"
+    client = docker.from_env()
+
+    try:
+        container = client.containers.get(container_name)
+        if container.status == "running":
+            env.status = "running"
+            await db.commit()
+            return {"message": "Environment is already running"}
+
+        env.status = "starting"
+        await db.commit()
+        container.start()
+        env.status = "running"
+        await db.commit()
+        return {"message": f"Environment {env.name} started"}
+    except docker.errors.NotFound:
+        env.status = "error"
+        await db.commit()
+        raise HTTPException(status_code=409, detail="Container not found. Please recreate the environment.")
+    except Exception as e:
+        env.status = "error"
+        await db.commit()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{environment_id}/stop", status_code=status.HTTP_200_OK)
+async def stop_environment(environment_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Environment).where(Environment.id == environment_id))
+    env = result.scalars().first()
+    if env is None:
+        raise HTTPException(status_code=404, detail="Environment not found")
+
+    container_name = f"lyra-{env.name}-{env.id}"
+    client = docker.from_env()
+
+    try:
+        container = client.containers.get(container_name)
+        if container.status != "running":
+            env.status = "stopped"
+            await db.commit()
+            return {"message": "Environment is already stopped"}
+
+        env.status = "stopping"
+        await db.commit()
+        container.stop(timeout=0)
+        return {"message": f"Environment {env.name} is stopping"}
+    except docker.errors.NotFound:
+        env.status = "stopped"
+        await db.commit()
+        return {"message": "Container not found. Environment marked as stopped."}
+    except Exception as e:
+        env.status = "error"
+        await db.commit()
+        raise HTTPException(status_code=500, detail=str(e))
