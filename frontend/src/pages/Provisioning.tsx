@@ -13,6 +13,11 @@ interface MountPoint {
   mode: 'rw' | 'ro';
 }
 
+interface CustomPortMapping {
+  host_port: number;
+  container_port: number;
+}
+
 export default function Provisioning() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -42,6 +47,8 @@ export default function Provisioning() {
   const [totalGpus, setTotalGpus] = useState(0);
 
   const [mounts, setMounts] = useState<MountPoint[]>([]);
+  const [customPorts, setCustomPorts] = useState<CustomPortMapping[]>([]);
+  const [isAllocatingPort, setIsAllocatingPort] = useState(false);
   const [dockerfile, setDockerfile] = useState('FROM python:3.11-slim\n\n');
 
   // Fetch GPU Resources and Load Template
@@ -91,6 +98,30 @@ export default function Provisioning() {
     setMounts(newMounts);
   };
 
+  const handleAddCustomPort = async () => {
+    try {
+      setIsAllocatingPort(true);
+      const res = await axios.post('environments/ports/allocate', {
+        count: 1,
+        current_ports: customPorts,
+      });
+      const mappings = Array.isArray(res.data?.mappings) ? res.data.mappings : [];
+      if (mappings.length > 0) {
+        setCustomPorts((prev) => [...prev, mappings[0]]);
+      } else {
+        showToast('Unable to allocate a custom port.', 'error');
+      }
+    } catch {
+      showToast('Unable to allocate a custom port.', 'error');
+    } finally {
+      setIsAllocatingPort(false);
+    }
+  };
+
+  const handleRemoveCustomPort = (index: number) => {
+    setCustomPorts((prev) => prev.filter((_, i) => i !== index));
+  };
+
   // Error State
   const [errors, setErrors] = useState<{name?: string, password?: string}>({});
 
@@ -119,6 +150,7 @@ export default function Provisioning() {
         container_user: 'root',
         root_password: password,
         mount_config: validMounts,
+        custom_ports: customPorts,
         dockerfile_content: dockerfile,
         gpu_count: gpuCount
       };
@@ -161,7 +193,7 @@ export default function Provisioning() {
           setIsSaveModalOpen(false);
           setTemplateName('');
           setTemplateDesc('');
-          showToast("Template saved successfully!", "success");
+          showToast("Template has been saved.", "success");
       } catch (error) {
           console.error("Failed to save template", error);
           showToast("Failed to save template.", "error");
@@ -437,6 +469,51 @@ export default function Provisioning() {
             </div>
           </section>
 
+          {/* Custom Port Mappings */}
+          <section className="bg-[#18181b] p-6 rounded-xl border border-[#27272a] space-y-4">
+            <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <span className="w-1 h-5 bg-cyan-500 rounded-full"></span>
+                  Custom Ports
+                </h3>
+                <button
+                  onClick={handleAddCustomPort}
+                  disabled={isAllocatingPort}
+                  className="p-1 hover:bg-[#27272a] rounded text-gray-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Auto allocate a custom port mapping"
+                >
+                  <Plus size={18} className={isAllocatingPort ? 'animate-spin' : ''} />
+                </button>
+            </div>
+
+            <div className="space-y-3">
+              {customPorts.map((mapping, idx) => (
+                <div
+                  key={`${mapping.host_port}-${mapping.container_port}-${idx}`}
+                  className="bg-[#27272a]/50 p-4 rounded-xl border border-[#3f3f46] flex items-center justify-between gap-3"
+                >
+                  <div className="font-mono text-sm text-gray-200 min-w-0 overflow-x-auto whitespace-nowrap scrollbar-hide">
+                    <span className="text-cyan-300">{mapping.host_port}</span>
+                    <span className="text-gray-500 px-2">:</span>
+                    <span className="text-green-300">{mapping.container_port}</span>
+                  </div>
+                  <button
+                    onClick={() => handleRemoveCustomPort(idx)}
+                    className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
+                    title="Remove custom port mapping"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+              {customPorts.length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-4 bg-[#27272a]/50 rounded-lg border border-dashed border-[#3f3f46]">
+                  No custom ports allocated
+                </p>
+              )}
+            </div>
+          </section>
+
         </div>
 
         {/* Right Column: Dockerfile Editor */}
@@ -521,9 +598,9 @@ export default function Provisioning() {
                                         if (template.config.dockerfile_content) {
                                             setDockerfile(template.config.dockerfile_content);
                                             setIsLoadModalOpen(false);
-                                            showToast("Template loaded successfully!", "success");
+                                            showToast("Template has been loaded.", "success");
                                         } else {
-                                            showToast("This template has no Dockerfile content.", "error");
+                                            showToast("This template does not include Dockerfile content.", "error");
                                         }
                                     }}
                                     className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-md transition-colors flex items-center gap-1.5 shadow-lg shadow-blue-500/20"

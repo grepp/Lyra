@@ -1,7 +1,8 @@
 import axios from 'axios';
-import { HardDrive, HelpCircle, LayoutTemplate, Network, Play, RefreshCw, Square, SquareTerminal, Trash2, X } from 'lucide-react';
+import { Code2, HardDrive, HelpCircle, LayoutTemplate, Network, Play, RefreshCw, Square, SquareTerminal, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import Modal from '../components/Modal';
+import { useToast } from '../context/ToastContext';
 
 interface MountConfig {
   host_path: string;
@@ -9,21 +10,30 @@ interface MountConfig {
   mode: string;
 }
 
+interface CustomPortMapping {
+  host_port: number;
+  container_port: number;
+}
+
 interface Environment {
   id: string;
   name: string;
   status: string;
+  container_user?: string;
   gpu_indices: number[];
   container_id?: string;
   ssh_port: number;
   jupyter_port: number;
+  code_port: number;
   created_at: string;
   mount_config: MountConfig[];
+  custom_ports: CustomPortMapping[];
 }
 
 const ENVS_CACHE_KEY = 'lyra.dashboard.environments';
 
 export default function Dashboard() {
+  const { showToast } = useToast();
   const [environments, setEnvironments] = useState<Environment[]>(() => {
     try {
       if (typeof window === 'undefined') return [];
@@ -45,6 +55,7 @@ export default function Dashboard() {
   });
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [selectedVolEnv, setSelectedVolEnv] = useState<Environment | null>(null);
+  const [selectedPortEnv, setSelectedPortEnv] = useState<Environment | null>(null);
   const [errorLogEnv, setErrorLogEnv] = useState<Environment | null>(null);
   const [errorLog, setErrorLog] = useState<string>("");
   const [logLoading, setLogLoading] = useState(false);
@@ -132,6 +143,44 @@ export default function Dashboard() {
     });
   };
 
+  const copySshCommand = async (sshCommand: string) => {
+    try {
+      await navigator.clipboard.writeText(sshCommand);
+      showToast('SSH command copied to clipboard.', 'success');
+    } catch {
+      showToast(`Unable to copy. Run manually: ${sshCommand}`, 'error');
+    }
+  };
+
+  const copyEnvSshCommand = async (env: Environment) => {
+    const host = window.location.hostname;
+    const sshUser = env.container_user || 'root';
+    const sshCommand = `ssh -p ${env.ssh_port} ${sshUser}@${host}`;
+    await copySshCommand(sshCommand);
+  };
+
+  const openJupyter = async (env: Environment) => {
+    try {
+      const res = await axios.post(`environments/${env.id}/jupyter/launch`);
+      const launchUrl = String(res.data.launch_url || '');
+      if (!launchUrl) {
+        showToast('Unable to open Jupyter: launch URL was not returned.', 'error');
+        return;
+      }
+      const targetUrl = launchUrl.startsWith('http') ? launchUrl : `${window.location.origin}${launchUrl}`;
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    } catch {
+      showToast('Unable to open Jupyter. Please ensure the environment is running.', 'error');
+    }
+  };
+
+  const openCodeServer = (env: Environment) => {
+    const protocol = window.location.protocol;
+    const host = window.location.hostname;
+    const url = `${protocol}//${host}:${env.code_port}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   useEffect(() => {
     fetchEnvironments({ showLoading: true });
     const interval = setInterval(() => {
@@ -189,6 +238,49 @@ export default function Dashboard() {
                 <div className="p-4 border-t border-[#3f3f46] bg-[#27272a]/50 flex justify-end">
                     <button
                         onClick={() => setSelectedVolEnv(null)}
+                        className="px-4 py-2 rounded-lg text-sm font-medium bg-[#3f3f46] hover:bg-[#52525b] text-white transition-all"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
+      {/* Port Details Modal */}
+      {selectedPortEnv && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-[#18181b] rounded-xl border border-[#3f3f46] shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="p-6 border-b border-[#3f3f46] flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                        <Network size={20} className="text-cyan-400" />
+                        Custom Port Mappings
+                    </h3>
+                    <button onClick={() => setSelectedPortEnv(null)} className="text-gray-400 hover:text-white transition-colors">
+                        <X size={20} />
+                    </button>
+                </div>
+                <div className="p-6">
+                    <p className="text-gray-400 text-sm mb-4">
+                        Custom ports for <span className="text-white font-medium">{selectedPortEnv.name}</span>
+                    </p>
+                    <div className="space-y-3">
+                        {selectedPortEnv.custom_ports.map((mapping, idx) => (
+                            <div key={`${mapping.host_port}-${mapping.container_port}-${idx}`} className="bg-[#27272a] p-3 rounded-lg border border-[#3f3f46] text-sm">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-cyan-400 uppercase w-14 shrink-0">Host</span>
+                                    <span className="text-gray-300 font-mono">{mapping.host_port}</span>
+                                    <span className="text-gray-600 px-2">:</span>
+                                    <span className="text-xs font-bold text-green-400 uppercase w-10 shrink-0">Port</span>
+                                    <span className="text-gray-300 font-mono">{mapping.container_port}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                <div className="p-4 border-t border-[#3f3f46] bg-[#27272a]/50 flex justify-end">
+                    <button
+                        onClick={() => setSelectedPortEnv(null)}
                         className="px-4 py-2 rounded-lg text-sm font-medium bg-[#3f3f46] hover:bg-[#52525b] text-white transition-all"
                     >
                         Close
@@ -268,7 +360,7 @@ export default function Dashboard() {
                         <tr>
                             <th className="px-6 py-4 font-medium">Name</th>
                             <th className="px-6 py-4 font-medium">Status</th>
-                            <th className="px-6 py-4 font-medium">Ports (SSH/Jupyter)</th>
+                            <th className="px-6 py-4 font-medium">Ports (SSH/Jupyter/Code)</th>
                             <th className="px-6 py-4 font-medium">GPU</th>
                             <th className="px-6 py-4 font-medium text-right">Actions</th>
                         </tr>
@@ -314,27 +406,45 @@ export default function Dashboard() {
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 text-gray-300">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex items-center gap-1.5" title="SSH Port">
-                                            <span>{env.ssh_port}</span>
-                                            <button
-                                                className="p-1 hover:bg-[#3f3f46] rounded text-gray-500 hover:text-blue-400 transition-colors"
-                                                title="Connect via SSH (Coming Soon)"
-                                            >
-                                                <SquareTerminal size={14} />
-                                            </button>
+                                    {env.status === 'stopped' || env.status === 'error' ? (
+                                        <span>-</span>
+                                    ) : (
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-1.5" title="SSH Port">
+                                                <span>{env.ssh_port}</span>
+                                                <button
+                                                    onClick={() => copyEnvSshCommand(env)}
+                                                    disabled={env.status !== 'running'}
+                                                    className="p-1 hover:bg-[#3f3f46] rounded text-gray-500 hover:text-blue-400 transition-colors"
+                                                    title={env.status === 'running' ? 'Copy SSH command' : 'Environment must be running'}
+                                                >
+                                                    <SquareTerminal size={14} />
+                                                </button>
+                                            </div>
+                                            <span className="text-gray-600">/</span>
+                                            <div className="flex items-center gap-1.5" title="Jupyter Port">
+                                                <span>{env.jupyter_port}</span>
+                                                <button
+                                                    onClick={() => openJupyter(env)}
+                                                    className="p-1 hover:bg-[#3f3f46] rounded text-gray-500 hover:text-orange-400 transition-colors"
+                                                    title="Open Jupyter Lab"
+                                                >
+                                                    <LayoutTemplate size={14} />
+                                                </button>
+                                            </div>
+                                            <span className="text-gray-600">/</span>
+                                            <div className="flex items-center gap-1.5" title="Code-server Port">
+                                                <span>{env.code_port}</span>
+                                                <button
+                                                    onClick={() => openCodeServer(env)}
+                                                    className="p-1 hover:bg-[#3f3f46] rounded text-gray-500 hover:text-cyan-400 transition-colors"
+                                                    title="Open code-server"
+                                                >
+                                                    <Code2 size={14} />
+                                                </button>
+                                            </div>
                                         </div>
-                                        <span className="text-gray-600">/</span>
-                                        <div className="flex items-center gap-1.5" title="Jupyter Port">
-                                            <span>{env.jupyter_port}</span>
-                                            <button
-                                                className="p-1 hover:bg-[#3f3f46] rounded text-gray-500 hover:text-orange-400 transition-colors"
-                                                title="Open Jupyter Lab (Coming Soon)"
-                                            >
-                                                <LayoutTemplate size={14} />
-                                            </button>
-                                        </div>
-                                    </div>
+                                    )}
                                 </td>
                                 <td className="px-6 py-4 text-gray-300">
                                     {env.gpu_indices.length > 0 ? env.gpu_indices.join(', ') : "-"}
@@ -386,8 +496,18 @@ export default function Dashboard() {
                                         <HardDrive size={18} />
                                     </button>
                                     <button
-                                        className="p-2 hover:bg-[#3f3f46] rounded-lg text-gray-400 hover:text-purple-400 transition-colors"
-                                        title="Manage Ports (Coming Soon)"
+                                        onClick={() => {
+                                            if (env.custom_ports && env.custom_ports.length > 0) {
+                                                setSelectedPortEnv(env);
+                                            }
+                                        }}
+                                        disabled={!env.custom_ports || env.custom_ports.length === 0}
+                                        className={`p-2 rounded-lg transition-colors ${
+                                            env.custom_ports && env.custom_ports.length > 0
+                                            ? "text-gray-400 hover:text-cyan-400 hover:bg-cyan-500/10"
+                                            : "text-gray-600 cursor-not-allowed opacity-30"
+                                        }`}
+                                        title={env.custom_ports && env.custom_ports.length > 0 ? "View Custom Ports" : "No Custom Ports"}
                                     >
                                         <Network size={18} />
                                     </button>

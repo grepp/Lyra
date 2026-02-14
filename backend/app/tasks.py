@@ -2,10 +2,13 @@ from .worker import celery_app
 from .database import DATABASE_URL
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from .models import Environment
+from .models import Environment, Setting
 import docker
 import tempfile
 import os
+import secrets
+import random
+import json
 
 
 # Sync database setup for Celery
@@ -14,6 +17,105 @@ import os
 SYNC_DATABASE_URL = DATABASE_URL.replace("postgresql+asyncpg", "postgresql")
 engine = create_engine(SYNC_DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
+CONTAINER_RUN_PORT_RETRIES = 3
+CUSTOM_HOST_PORT_RANGE = (35001, 60000)
+
+
+def _get_docker_used_ports() -> set[int]:
+    used_ports: set[int] = set()
+    try:
+        client = docker.from_env()
+        containers = client.containers.list(all=True)
+        for container in containers:
+            ports = container.attrs.get("NetworkSettings", {}).get("Ports", {}) or {}
+            for bindings in ports.values():
+                if not bindings:
+                    continue
+                for binding in bindings:
+                    host_port = binding.get("HostPort")
+                    if host_port and str(host_port).isdigit():
+                        used_ports.add(int(host_port))
+    except Exception:
+        # If Docker inspection fails, run() retry logic will still handle conflicts.
+        pass
+    return used_ports
+
+
+def _pick_free_port(start: int, end: int, blocked_ports: set[int]) -> int:
+    candidates = list(range(start, end + 1))
+    random.shuffle(candidates)
+    for port in candidates:
+        if port in blocked_ports:
+            continue
+        return port
+    raise RuntimeError(f"No available host ports in range {start}-{end}")
+
+
+def _allocate_ports(db, exclude_environment_id=None):
+    query = db.query(Environment.ssh_port, Environment.jupyter_port, Environment.code_port)
+    if exclude_environment_id is not None:
+        query = query.filter(Environment.id != exclude_environment_id)
+    rows = query.all()
+
+    blocked_ports = set()
+    for ssh_port, jupyter_port, code_port in rows:
+        blocked_ports.add(ssh_port)
+        blocked_ports.add(jupyter_port)
+        blocked_ports.add(code_port)
+
+    custom_port_settings = db.query(Setting).filter(Setting.key.like("custom_ports:%")).all()
+    for setting in custom_port_settings:
+        try:
+            mappings = json.loads(setting.value)
+        except Exception:
+            continue
+        for mapping in mappings or []:
+            host_port = mapping.get("host_port")
+            if isinstance(host_port, int):
+                blocked_ports.add(host_port)
+            elif isinstance(host_port, str) and host_port.isdigit():
+                blocked_ports.add(int(host_port))
+
+    blocked_ports.update(_get_docker_used_ports())
+
+    ssh_port = _pick_free_port(20000, 25000, blocked_ports)
+    blocked_ports.add(ssh_port)
+    jupyter_port = _pick_free_port(25001, 30000, blocked_ports)
+    blocked_ports.add(jupyter_port)
+    code_port = _pick_free_port(30001, 35000, blocked_ports)
+    return ssh_port, jupyter_port, code_port
+
+
+def _allocate_custom_host_ports(db, count: int, exclude_environment_id=None):
+    blocked_ports = _get_docker_used_ports()
+    rows = db.query(Environment.ssh_port, Environment.jupyter_port, Environment.code_port).all()
+    for ssh_port, jupyter_port, code_port in rows:
+        blocked_ports.add(ssh_port)
+        blocked_ports.add(jupyter_port)
+        blocked_ports.add(code_port)
+
+    custom_port_settings = db.query(Setting).filter(Setting.key.like("custom_ports:%")).all()
+    for setting in custom_port_settings:
+        if exclude_environment_id is not None and setting.key == f"custom_ports:{exclude_environment_id}":
+            continue
+        try:
+            mappings = json.loads(setting.value)
+        except Exception:
+            continue
+        for mapping in mappings or []:
+            host_port = mapping.get("host_port")
+            if isinstance(host_port, int):
+                blocked_ports.add(host_port)
+            elif isinstance(host_port, str) and host_port.isdigit():
+                blocked_ports.add(int(host_port))
+
+    host_start, host_end = CUSTOM_HOST_PORT_RANGE
+    allocated = []
+    for _ in range(count):
+        host_port = _pick_free_port(host_start, host_end, blocked_ports)
+        blocked_ports.add(host_port)
+        allocated.append(host_port)
+    return allocated
 
 
 @celery_app.task(bind=True)
@@ -64,10 +166,30 @@ def create_environment_task(self, environment_id):
 
         # 2. Run Container
         # Basic container configuration
+        token_key = f"jupyter_token:{env.id}"
+        token_setting = db.query(Setting).filter(Setting.key == token_key).first()
+        if not token_setting:
+            token_setting = Setting(key=token_key, value=secrets.token_urlsafe(32))
+            db.add(token_setting)
+            db.commit()
+        jupyter_token = token_setting.value
+
+        custom_ports_key = f"custom_ports:{env.id}"
+        custom_ports_setting = db.query(Setting).filter(Setting.key == custom_ports_key).first()
+        custom_ports = []
+        if custom_ports_setting:
+            try:
+                custom_ports = json.loads(custom_ports_setting.value) or []
+            except Exception:
+                custom_ports = []
+
         container_config = {
             "image": image_name,
             "name": f"lyra-{env.name}-{env.id}",  # Ensure unique name
             "detach": True,
+            "environment": {
+                "JUPYTER_TOKEN": jupyter_token
+            },
             "ports": {
                 '22/tcp': env.ssh_port,
                 '8888/tcp': env.jupyter_port,
@@ -78,13 +200,18 @@ def create_environment_task(self, environment_id):
             "command": (
                 "sh -c \""
                 "apt-get update && "
-                "apt-get install -y openssh-server python3-pip && "
+                "apt-get install -y openssh-server python3-pip curl && "
                 "mkdir -p /var/run/sshd && "
                 f"echo 'root:{env.root_password}' | chpasswd && "
                 "echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config && "
-                "pip3 install jupyterlab && "
+                "python3 -m pip install --no-cache-dir jupyterlab && "
+                "curl -fsSL https://code-server.dev/install.sh -o /tmp/install-code-server.sh && "
+                "sh /tmp/install-code-server.sh && "
                 "/usr/sbin/sshd && "
-                "jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root\""
+                "(code-server --bind-addr 0.0.0.0:8080 --auth none /root >/tmp/code-server.log 2>&1 &) && "
+                "python3 -m jupyterlab --ip=0.0.0.0 --port=8888 --no-browser --allow-root "
+                "--ServerApp.token=\"$JUPYTER_TOKEN\" "
+                "--NotebookApp.token=\"$JUPYTER_TOKEN\"\""
             )
         }
 
@@ -124,7 +251,40 @@ def create_environment_task(self, environment_id):
         if volumes:
             container_config['volumes'] = volumes
 
-        client.containers.run(**container_config)
+        for attempt in range(CONTAINER_RUN_PORT_RETRIES):
+            ports_config = {
+                '22/tcp': env.ssh_port,
+                '8888/tcp': env.jupyter_port,
+                '8080/tcp': env.code_port
+            }
+            for mapping in custom_ports:
+                container_port = mapping.get("container_port")
+                host_port = mapping.get("host_port")
+                if container_port is None or host_port is None:
+                    continue
+                ports_config[f"{int(container_port)}/tcp"] = int(host_port)
+            container_config["ports"] = ports_config
+            try:
+                client.containers.run(**container_config)
+                break
+            except docker.errors.APIError as run_error:
+                message = str(run_error).lower()
+                is_port_conflict = "port is already allocated" in message or "address already in use" in message
+                if not is_port_conflict or attempt == CONTAINER_RUN_PORT_RETRIES - 1:
+                    raise
+                new_ssh_port, new_jupyter_port, new_code_port = _allocate_ports(db, exclude_environment_id=env.id)
+                env.ssh_port = new_ssh_port
+                env.jupyter_port = new_jupyter_port
+                env.code_port = new_code_port
+                if custom_ports:
+                    new_custom_host_ports = _allocate_custom_host_ports(
+                        db, len(custom_ports), exclude_environment_id=env.id
+                    )
+                    for idx, mapping in enumerate(custom_ports):
+                        mapping["host_port"] = new_custom_host_ports[idx]
+                    if custom_ports_setting:
+                        custom_ports_setting.value = json.dumps(custom_ports)
+                db.commit()
 
         env.status = "running"
         db.commit()

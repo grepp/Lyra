@@ -10,17 +10,22 @@ class MountConfig(BaseModel):
     mode: str = "rw"
 
 
+class CustomPortMapping(BaseModel):
+    host_port: int
+    container_port: int
+
+
 class EnvironmentBase(BaseModel):
     name: str = Field(pattern=r"^[a-zA-Z0-9-]+$")
     container_user: str = "root"
-    root_password: str = "admin"
     dockerfile_content: Optional[str] = None
     mount_config: List[MountConfig] = []
+    custom_ports: List[CustomPortMapping] = []
     gpu_count: int = 0
 
 
 class EnvironmentCreate(EnvironmentBase):
-    pass
+    root_password: str = "admin"
 
 
 class EnvironmentResponse(EnvironmentBase):
@@ -35,6 +40,15 @@ class EnvironmentResponse(EnvironmentBase):
 
     class Config:
         from_attributes = True
+
+
+class CustomPortAllocateRequest(BaseModel):
+    count: int = 1
+    current_ports: List[CustomPortMapping] = []
+
+
+class CustomPortAllocateResponse(BaseModel):
+    mappings: List[CustomPortMapping]
 
 
 class SettingBase(BaseModel):
