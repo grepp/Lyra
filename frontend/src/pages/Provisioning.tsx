@@ -246,13 +246,13 @@ export default function Provisioning() {
 
       {/* Save Template Modal */}
       {isSaveModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-[#18181b] rounded-xl border border-[#3f3f46] shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] backdrop-blur-sm">
+            <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
                 <div className="p-6 space-y-4">
-                    <h3 className="text-xl font-bold text-white">{t('provisioning.saveAsTemplate')}</h3>
+                    <h3 className="text-xl font-bold text-[var(--text)]">{t('provisioning.saveAsTemplate')}</h3>
 
                     <div className="space-y-1">
-                        <label className="text-sm font-medium text-gray-400">{t('provisioning.templateName')}</label>
+                        <label className="text-sm font-medium text-[var(--text-muted)]">{t('provisioning.templateName')}</label>
                         <input
                             value={templateName}
                             onChange={(e) => {
@@ -260,10 +260,10 @@ export default function Provisioning() {
                                 if (templateErrors.name) setTemplateErrors({});
                             }}
                             className={clsx(
-                                "w-full bg-[#27272a] border rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-1 transition-all",
+                                "w-full bg-[var(--bg)] border rounded-lg px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-1 transition-all",
                                 templateErrors.name
                                     ? "border-red-500/50 focus:border-red-500 focus:ring-red-500/20"
-                                    : "border-[#3f3f46] focus:border-blue-500 focus:ring-blue-500"
+                                    : "border-[var(--border)] focus:border-blue-500 focus:ring-blue-500"
                             )}
                             placeholder={t('provisioning.templateNamePlaceholder')}
                         />
@@ -273,22 +273,22 @@ export default function Provisioning() {
                     </div>
 
                     <div className="space-y-1">
-                        <label className="text-sm font-medium text-gray-400">{t('provisioning.description')}</label>
+                        <label className="text-sm font-medium text-[var(--text-muted)]">{t('provisioning.description')}</label>
                         <textarea
                             value={templateDesc}
                             onChange={(e) => setTemplateDesc(e.target.value)}
-                            className="w-full bg-[#27272a] border border-[#3f3f46] rounded-lg px-4 py-2 text-white focus:border-blue-500 focus:outline-none resize-none h-24"
+                            className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-lg px-4 py-2 text-[var(--text)] focus:border-blue-500 focus:outline-none resize-none h-24"
                             placeholder={t('provisioning.optionalDescription')}
                         />
                     </div>
                 </div>
-                <div className="p-4 border-t border-[#3f3f46] flex justify-end gap-3 bg-[#27272a]/50">
+                <div className="p-4 border-t border-[var(--border)] flex justify-end gap-3 bg-[var(--bg)]">
                     <button
                         onClick={() => {
                             setIsSaveModalOpen(false);
                             setTemplateErrors({});
                         }}
-                        className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-[#3f3f46] transition-colors"
+                        className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text)] hover:brightness-95 transition-colors"
                     >
                         {t('actions.cancel')}
                     </button>
@@ -305,8 +305,8 @@ export default function Provisioning() {
 
       <header className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold text-white tracking-tight">{t('provisioning.title')}</h2>
-          <p className="text-gray-400 mt-1">{t('provisioning.subtitle')}</p>
+          <h2 className="text-3xl font-bold text-[var(--text)] tracking-tight">{t('provisioning.title')}</h2>
+          <p className="text-[var(--text-muted)] mt-1">{t('provisioning.subtitle')}</p>
         </div>
         <div className="flex gap-3">
           <button
@@ -324,24 +324,24 @@ export default function Provisioning() {
         <div className="lg:col-span-1 space-y-6">
 
           {/* Basic Info */}
-          <section className="bg-[#18181b] p-6 rounded-xl border border-[#27272a] space-y-4">
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+          <section className="bg-[var(--bg-elevated)] p-6 rounded-xl border border-[var(--border)] space-y-4">
+            <h3 className="text-lg font-semibold text-[var(--text)] flex items-center gap-2">
               <span className="w-1 h-5 bg-blue-500 rounded-full"></span>
               {t('provisioning.basicConfiguration')}
             </h3>
 
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-400">{t('provisioning.environmentName')}</label>
+              <label className="text-sm font-medium text-[var(--text-muted)]">{t('provisioning.environmentName')}</label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={t('provisioning.environmentNamePlaceholder')}
                 className={clsx(
-                  "w-full bg-[#27272a] border rounded-lg px-4 py-2.5 text-white focus:outline-none focus:ring-1 transition-all",
+                  "w-full bg-[var(--bg)] border rounded-lg px-4 py-2.5 text-[var(--text)] focus:outline-none focus:ring-1 transition-all",
                   errors.name
                     ? "border-red-500/50 focus:border-red-500 focus:ring-red-500/20"
-                    : "border-[#3f3f46] focus:border-blue-500 focus:ring-blue-500"
+                    : "border-[var(--border)] focus:border-blue-500 focus:ring-blue-500"
                 )}
               />
               {errors.name && (
@@ -350,25 +350,25 @@ export default function Provisioning() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-medium text-gray-400">{t('provisioning.rootPassword')}</label>
+              <label className="text-sm font-medium text-[var(--text-muted)]">{t('provisioning.rootPassword')}</label>
               <div
                 className={clsx(
-                  "w-full bg-[#27272a] border rounded-lg px-3 py-1.5 flex items-center gap-2 focus-within:ring-1 transition-all",
+                  "w-full bg-[var(--bg)] border rounded-lg px-3 py-1.5 flex items-center gap-2 focus-within:ring-1 transition-all",
                   errors.password
                     ? "border-red-500/50 focus-within:border-red-500 focus-within:ring-red-500/20"
-                    : "border-[#3f3f46] focus-within:border-blue-500 focus-within:ring-blue-500"
+                    : "border-[var(--border)] focus-within:border-blue-500 focus-within:ring-blue-500"
                 )}
               >
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="min-w-0 flex-1 bg-transparent px-1 py-1 text-white focus:outline-none font-mono"
+                  className="min-w-0 flex-1 bg-transparent px-1 py-1 text-[var(--text)] focus:outline-none font-mono"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="shrink-0 p-1 rounded text-gray-400 hover:text-white hover:bg-[#3f3f46] transition-colors"
+                  className="shrink-0 p-1 rounded text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg)] transition-colors"
                   title={showPassword ? t('provisioning.hidePassword') : t('provisioning.showPassword')}
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -381,16 +381,16 @@ export default function Provisioning() {
           </section>
 
           {/* Resources */}
-          <section className="bg-[#18181b] p-6 rounded-xl border border-[#27272a] space-y-4">
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+          <section className="bg-[var(--bg-elevated)] p-6 rounded-xl border border-[var(--border)] space-y-4">
+            <h3 className="text-lg font-semibold text-[var(--text)] flex items-center gap-2">
               <span className="w-1 h-5 bg-purple-500 rounded-full"></span>
               {t('provisioning.resourcesTitle')}
             </h3>
 
             <div className="space-y-4">
               <div className="flex justify-between items-end">
-                  <label className="text-sm font-medium text-gray-400">{t('provisioning.gpuAllocation')}</label>
-                  <span className="text-2xl font-bold text-purple-400">{gpuCount} <span className="text-sm font-normal text-gray-500">{t('provisioning.gpus')}</span></span>
+                  <label className="text-sm font-medium text-[var(--text-muted)]">{t('provisioning.gpuAllocation')}</label>
+                  <span className="text-2xl font-bold text-purple-400">{gpuCount} <span className="text-sm font-normal text-[var(--text-muted)]">{t('provisioning.gpus')}</span></span>
               </div>
 
               <div className="relative pt-6 pb-2">
@@ -402,11 +402,11 @@ export default function Provisioning() {
                     value={gpuCount}
                     onChange={(e) => setGpuCount(parseInt(e.target.value))}
                     className={clsx(
-                      "w-full h-2 rounded-lg appearance-none border border-[#3f3f46]",
-                      (!maxGpus || maxGpus === 0) ? "bg-[#27272a] cursor-not-allowed" : "bg-[#27272a] cursor-pointer accent-purple-500"
+                      "w-full h-2 rounded-lg appearance-none border border-[var(--border)]",
+                      (!maxGpus || maxGpus === 0) ? "bg-[var(--bg)] cursor-not-allowed" : "bg-[var(--bg)] cursor-pointer accent-purple-500"
                     )}
                   />
-                  <div className="flex justify-between text-xs text-gray-500 mt-2">
+                  <div className="flex justify-between text-xs text-[var(--text-muted)] mt-2">
                       <span>0</span>
                       <span>{t('provisioning.maxAvailable', { count: maxGpus || 0 })}</span>
                   </div>
@@ -419,33 +419,33 @@ export default function Provisioning() {
           </section>
 
           {/* Storage */}
-          <section className="bg-[#18181b] p-6 rounded-xl border border-[#27272a] space-y-4">
+          <section className="bg-[var(--bg-elevated)] p-6 rounded-xl border border-[var(--border)] space-y-4">
             <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-[var(--text)] flex items-center gap-2">
                 <span className="w-1 h-5 bg-green-500 rounded-full"></span>
                 {t('provisioning.volumeMounts')}
                 </h3>
-                <button onClick={handleAddMount} className="p-1 hover:bg-[#27272a] rounded text-gray-400 hover:text-white transition-colors">
+                <button onClick={handleAddMount} className="p-1 hover:bg-[var(--bg)] rounded text-[var(--text-muted)] hover:text-[var(--text)] transition-colors">
                     <Plus size={18} />
                 </button>
             </div>
 
             <div className="space-y-3">
               {mounts.map((mount, idx) => (
-                <div key={idx} className="bg-[#27272a]/50 p-4 rounded-xl border border-[#3f3f46] space-y-3 group transition-all hover:border-[#4f4f5a]">
+                <div key={idx} className="bg-[var(--bg)] p-4 rounded-xl border border-[var(--border)] space-y-3 group transition-all hover:brightness-95">
                     <div className="flex gap-2 items-center">
                         <div className="flex-1 relative min-w-0">
-                             <FolderOpen size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                             <FolderOpen size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
                             <input
                                 placeholder={t('provisioning.hostPathPlaceholder')}
                                 value={mount.host_path}
                                 onChange={(e) => handleMountChange(idx, 'host_path', e.target.value)}
-                                className="w-full bg-[#18181b] border border-[#3f3f46] rounded-lg px-3 py-2 pl-9 text-sm text-gray-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all"
+                                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2 pl-9 text-sm text-[var(--text)] focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all"
                             />
                         </div>
                         <button
                             onClick={() => handleRemoveMount(idx)}
-                            className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
+                            className="p-2 text-[var(--text-muted)] hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
                             title={t('provisioning.removeMount')}
                         >
                             <Trash2 size={16} />
@@ -453,21 +453,21 @@ export default function Provisioning() {
                     </div>
                     <div className="flex gap-2 items-center">
                         <div className="w-8 flex justify-center">
-                            <span className="text-gray-600 font-mono">:</span>
+                            <span className="text-[var(--text-muted)] font-mono">:</span>
                         </div>
                         <div className="flex-1 min-w-0">
                             <input
                                  placeholder={t('provisioning.containerPathPlaceholder')}
                                  value={mount.container_path}
                                  onChange={(e) => handleMountChange(idx, 'container_path', e.target.value)}
-                                 className="w-full bg-[#18181b] border border-[#3f3f46] rounded-lg px-3 py-2 text-sm text-gray-200 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all"
+                                 className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all"
                             />
                         </div>
                         <div className="w-20 shrink-0">
                             <select
                                 value={mount.mode}
                                 onChange={(e) => handleMountChange(idx, 'mode', e.target.value)}
-                                className="w-full bg-[#18181b] border border-[#3f3f46] rounded-lg px-2 py-2 text-xs text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
+                                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-2 py-2 text-xs text-[var(--text-muted)] focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
                             >
                                 <option value="rw">RW</option>
                                 <option value="ro">RO</option>
@@ -477,7 +477,7 @@ export default function Provisioning() {
                 </div>
               ))}
               {mounts.length === 0 && (
-                <p className="text-sm text-gray-500 text-center py-4 bg-[#27272a]/50 rounded-lg border border-dashed border-[#3f3f46]">
+                <p className="text-sm text-[var(--text-muted)] text-center py-4 bg-[var(--bg)] rounded-lg border border-dashed border-[var(--border)]">
                     {t('provisioning.noVolumesMounted')}
                 </p>
               )}
@@ -485,16 +485,16 @@ export default function Provisioning() {
           </section>
 
           {/* Custom Port Mappings */}
-          <section className="bg-[#18181b] p-6 rounded-xl border border-[#27272a] space-y-4">
+          <section className="bg-[var(--bg-elevated)] p-6 rounded-xl border border-[var(--border)] space-y-4">
             <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-[var(--text)] flex items-center gap-2">
                   <span className="w-1 h-5 bg-cyan-500 rounded-full"></span>
                   {t('provisioning.customPorts')}
                 </h3>
                 <button
                   onClick={handleAddCustomPort}
                   disabled={isAllocatingPort}
-                  className="p-1 hover:bg-[#27272a] rounded text-gray-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-1 hover:bg-[var(--bg)] rounded text-[var(--text-muted)] hover:text-[var(--text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title={t('provisioning.autoAllocateCustomPort')}
                 >
                   <Plus size={18} className={isAllocatingPort ? 'animate-spin' : ''} />
@@ -505,16 +505,16 @@ export default function Provisioning() {
               {customPorts.map((mapping, idx) => (
                 <div
                   key={`${mapping.host_port}-${mapping.container_port}-${idx}`}
-                  className="bg-[#27272a]/50 p-4 rounded-xl border border-[#3f3f46] flex items-center justify-between gap-3"
+                  className="bg-[var(--bg)] p-4 rounded-xl border border-[var(--border)] flex items-center justify-between gap-3"
                 >
-                  <div className="font-mono text-sm text-gray-200 min-w-0 overflow-x-auto whitespace-nowrap scrollbar-hide">
-                    <span className="text-cyan-300">{mapping.host_port}</span>
-                    <span className="text-gray-500 px-2">:</span>
-                    <span className="text-green-300">{mapping.container_port}</span>
+                  <div className="font-mono text-sm text-[var(--text)] min-w-0 overflow-x-auto whitespace-nowrap scrollbar-hide">
+                    <span className="text-sky-500">{mapping.host_port}</span>
+                    <span className="text-[var(--text-muted)] px-2">:</span>
+                    <span className="text-[var(--success)]">{mapping.container_port}</span>
                   </div>
                   <button
                     onClick={() => handleRemoveCustomPort(idx)}
-                    className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
+                    className="p-2 text-[var(--text-muted)] hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
                     title={t('provisioning.removeCustomPort')}
                   >
                     <Trash2 size={16} />
@@ -522,7 +522,7 @@ export default function Provisioning() {
                 </div>
               ))}
               {customPorts.length === 0 && (
-                <p className="text-sm text-gray-500 text-center py-4 bg-[#27272a]/50 rounded-lg border border-dashed border-[#3f3f46]">
+                <p className="text-sm text-[var(--text-muted)] text-center py-4 bg-[var(--bg)] rounded-lg border border-dashed border-[var(--border)]">
                   {t('provisioning.noCustomPortsAllocated')}
                 </p>
               )}
@@ -532,25 +532,25 @@ export default function Provisioning() {
         </div>
 
         {/* Right Column: Dockerfile Editor */}
-        <div className="lg:col-span-2 flex flex-col h-[800px] bg-[#18181b] rounded-xl border border-[#27272a] overflow-hidden">
-             <div className="px-6 py-4 border-b border-[#27272a] flex justify-between items-center bg-[#27272a]/30">
+        <div className="lg:col-span-2 flex flex-col h-[800px] bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] overflow-hidden">
+             <div className="px-6 py-4 border-b border-[var(--border)] flex justify-between items-center bg-[var(--bg)]">
                 <div className="flex items-center gap-3">
                     <div className="p-1.5 bg-blue-500/10 rounded-md">
                         <span className="text-blue-400 font-mono text-sm font-bold">{t('provisioning.dockerfile')}</span>
                     </div>
-                    <span className="text-sm text-gray-400">{t('provisioning.buildConfiguration')}</span>
+                    <span className="text-sm text-[var(--text-muted)]">{t('provisioning.buildConfiguration')}</span>
                 </div>
                 <div className="flex gap-2">
                     <button
                         onClick={() => setIsLoadModalOpen(true)}
-                        className="px-3 py-1.5 bg-[#27272a] hover:bg-[#3f3f46] text-gray-300 hover:text-white rounded-md flex items-center gap-2 transition-colors border border-[#3f3f46] text-xs font-medium"
+                        className="px-3 py-1.5 bg-[var(--bg)] hover:brightness-95 text-[var(--text)] rounded-md flex items-center gap-2 transition-colors border border-[var(--border)] text-xs font-medium"
                     >
                         <Upload size={14} />
                         <span>{t('actions.load')}</span>
                     </button>
                     <button
                         onClick={() => setIsSaveModalOpen(true)}
-                        className="px-3 py-1.5 bg-[#27272a] hover:bg-[#3f3f46] text-gray-300 hover:text-white rounded-md flex items-center gap-2 transition-colors border border-[#3f3f46] text-xs font-medium"
+                        className="px-3 py-1.5 bg-[var(--bg)] hover:brightness-95 text-[var(--text)] rounded-md flex items-center gap-2 transition-colors border border-[var(--border)] text-xs font-medium"
                     >
                         <Save size={14} />
                         <span>{t('actions.save')}</span>
@@ -581,33 +581,33 @@ export default function Provisioning() {
 
       {/* Load Template Modal */}
       {isLoadModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-[#18181b] rounded-xl border border-[#3f3f46] shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[80vh]">
-                <div className="p-6 border-b border-[#27272a] flex justify-between items-center">
-                    <h3 className="text-xl font-bold text-white">{t('provisioning.loadTemplateTitle')}</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] backdrop-blur-sm">
+            <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[80vh]">
+                <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-[var(--text)]">{t('provisioning.loadTemplateTitle')}</h3>
                 </div>
 
-                <div className="p-4 overflow-y-auto space-y-3 flex-1 bg-[#18181b]">
+                <div className="p-4 overflow-y-auto space-y-3 flex-1 bg-[var(--bg-elevated)]">
                     {isLoadingTemplates ? (
                          <div className="text-center py-10">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-                            <p className="text-gray-400 text-sm">{t('provisioning.loadingTemplates')}</p>
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--text)] mx-auto mb-2"></div>
+                            <p className="text-[var(--text-muted)] text-sm">{t('provisioning.loadingTemplates')}</p>
                         </div>
                     ) : templates.length === 0 ? (
-                        <div className="text-center py-10 text-gray-400">
+                        <div className="text-center py-10 text-[var(--text-muted)]">
                             <p>{t('provisioning.noTemplatesFound')}</p>
                         </div>
                     ) : (
                         templates.map((template) => (
-                             <div key={template.id} className="bg-[#202023] rounded-lg border border-[#3f3f46] p-4 flex items-center justify-between group hover:border-[#52525b] transition-all">
+                             <div key={template.id} className="bg-[var(--bg)] rounded-lg border border-[var(--border)] p-4 flex items-center justify-between group hover:brightness-95 transition-all">
                                 <div className="min-w-0 flex-1 mr-4">
                                     <div className="flex items-center gap-2 mb-1">
-                                        <h4 className="font-bold text-white truncate">{template.name}</h4>
-                                        <span className="text-[10px] bg-[#27272a] text-gray-500 px-1.5 py-0.5 rounded border border-[#3f3f46]">
+                                        <h4 className="font-bold text-[var(--text)] truncate">{template.name}</h4>
+                                        <span className="text-[10px] bg-[var(--bg-elevated)] text-[var(--text-muted)] px-1.5 py-0.5 rounded border border-[var(--border)]">
                                             {new Date(template.created_at).toLocaleDateString()}
                                         </span>
                                     </div>
-                                    <p className="text-xs text-gray-400 truncate">
+                                    <p className="text-xs text-[var(--text-muted)] truncate">
                                         {template.description || t('provisioning.noDescription')}
                                     </p>
                                 </div>
@@ -630,10 +630,10 @@ export default function Provisioning() {
                     )}
                 </div>
 
-                <div className="p-4 border-t border-[#3f3f46] bg-[#27272a]/50 flex justify-end">
+                <div className="p-4 border-t border-[var(--border)] bg-[var(--bg)] flex justify-end">
                     <button
                         onClick={() => setIsLoadModalOpen(false)}
-                        className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-[#3f3f46] transition-colors"
+                        className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text)] hover:brightness-95 transition-colors"
                     >
                         {t('actions.close')}
                     </button>

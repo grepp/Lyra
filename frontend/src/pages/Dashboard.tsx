@@ -209,30 +209,30 @@ export default function Dashboard() {
 
       {/* Volume Details Modal */}
       {selectedVolEnv && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-[#18181b] rounded-xl border border-[#3f3f46] shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div className="p-6 border-b border-[#3f3f46] flex justify-between items-center">
-                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] backdrop-blur-sm">
+            <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-[var(--text)] flex items-center gap-2">
                         <HardDrive size={20} className="text-blue-400" />
                         {t('dashboard.volumeMounts')}
                     </h3>
-                    <button onClick={() => setSelectedVolEnv(null)} className="text-gray-400 hover:text-white transition-colors">
+                    <button onClick={() => setSelectedVolEnv(null)} className="text-[var(--text-muted)] hover:text-[var(--text)] transition-colors">
                         <X size={20} />
                     </button>
                 </div>
                 <div className="p-6">
-                    <p className="text-gray-400 text-sm mb-4">{t('dashboard.mountedVolumesFor', { name: selectedVolEnv.name })}</p>
+                    <p className="text-[var(--text-muted)] text-sm mb-4">{t('dashboard.mountedVolumesFor', { name: selectedVolEnv.name })}</p>
                     <div className="space-y-3">
                         {selectedVolEnv.mount_config.map((mount, idx) => (
-                            <div key={idx} className="bg-[#27272a] p-3 rounded-lg border border-[#3f3f46] text-sm">
+                            <div key={idx} className="bg-[var(--bg)] p-3 rounded-lg border border-[var(--border)] text-sm">
                                 <div className="flex items-center gap-2 mb-1">
                                     <span className="text-xs font-bold text-blue-400 uppercase w-10 shrink-0">{t('dashboard.hostLabel')}</span>
-                                    <span className="text-gray-300 font-mono overflow-x-auto whitespace-nowrap flex-1 scrollbar-hide">{mount.host_path}</span>
+                                    <span className="text-[var(--text)] font-mono overflow-x-auto whitespace-nowrap flex-1 scrollbar-hide">{mount.host_path}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span className="text-xs font-bold text-green-400 uppercase w-10 shrink-0">{t('dashboard.destinationLabel')}</span>
-                                    <span className="text-gray-300 font-mono overflow-x-auto whitespace-nowrap flex-1 scrollbar-hide">{mount.container_path}</span>
-                                    <span className="ml-auto text-[10px] bg-[#3f3f46] px-1.5 py-0.5 rounded text-gray-400 uppercase">
+                                    <span className="text-[var(--text)] font-mono overflow-x-auto whitespace-nowrap flex-1 scrollbar-hide">{mount.container_path}</span>
+                                    <span className="ml-auto text-[10px] bg-[var(--bg-elevated)] px-1.5 py-0.5 rounded text-[var(--text-muted)] border border-[var(--border)] uppercase">
                                         {mount.mode}
                                     </span>
                                 </div>
@@ -240,10 +240,10 @@ export default function Dashboard() {
                         ))}
                     </div>
                 </div>
-                <div className="p-4 border-t border-[#3f3f46] bg-[#27272a]/50 flex justify-end">
+                <div className="p-4 border-t border-[var(--border)] bg-[var(--bg)] flex justify-end">
                     <button
                         onClick={() => setSelectedVolEnv(null)}
-                        className="px-4 py-2 rounded-lg text-sm font-medium bg-[#3f3f46] hover:bg-[#52525b] text-white transition-all"
+                        className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] hover:brightness-95 transition-all"
                     >
                         {t('actions.close')}
                     </button>
@@ -254,37 +254,37 @@ export default function Dashboard() {
 
       {/* Port Details Modal */}
       {selectedPortEnv && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-[#18181b] rounded-xl border border-[#3f3f46] shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div className="p-6 border-b border-[#3f3f46] flex justify-between items-center">
-                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] backdrop-blur-sm">
+            <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-[var(--text)] flex items-center gap-2">
                         <Network size={20} className="text-cyan-400" />
                         {t('dashboard.customPortMappings')}
                     </h3>
-                    <button onClick={() => setSelectedPortEnv(null)} className="text-gray-400 hover:text-white transition-colors">
+                    <button onClick={() => setSelectedPortEnv(null)} className="text-[var(--text-muted)] hover:text-[var(--text)] transition-colors">
                         <X size={20} />
                     </button>
                 </div>
                 <div className="p-6">
-                    <p className="text-gray-400 text-sm mb-4">{t('dashboard.customPortsFor', { name: selectedPortEnv.name })}</p>
+                    <p className="text-[var(--text-muted)] text-sm mb-4">{t('dashboard.customPortsFor', { name: selectedPortEnv.name })}</p>
                     <div className="space-y-3">
                         {selectedPortEnv.custom_ports.map((mapping, idx) => (
-                            <div key={`${mapping.host_port}-${mapping.container_port}-${idx}`} className="bg-[#27272a] p-3 rounded-lg border border-[#3f3f46] text-sm">
+                            <div key={`${mapping.host_port}-${mapping.container_port}-${idx}`} className="bg-[var(--bg)] p-3 rounded-lg border border-[var(--border)] text-sm">
                                 <div className="flex items-center gap-2">
                                     <span className="text-xs font-bold text-cyan-400 uppercase w-14 shrink-0">{t('dashboard.hostLabel')}</span>
-                                    <span className="text-gray-300 font-mono">{mapping.host_port}</span>
-                                    <span className="text-gray-600 px-2">:</span>
+                                    <span className="text-[var(--text)] font-mono">{mapping.host_port}</span>
+                                    <span className="text-[var(--text-muted)] px-2">:</span>
                                     <span className="text-xs font-bold text-green-400 uppercase w-10 shrink-0">{t('dashboard.portLabel')}</span>
-                                    <span className="text-gray-300 font-mono">{mapping.container_port}</span>
+                                    <span className="text-[var(--text)] font-mono">{mapping.container_port}</span>
                                 </div>
                             </div>
                         ))}
                     </div>
                 </div>
-                <div className="p-4 border-t border-[#3f3f46] bg-[#27272a]/50 flex justify-end">
+                <div className="p-4 border-t border-[var(--border)] bg-[var(--bg)] flex justify-end">
                     <button
                         onClick={() => setSelectedPortEnv(null)}
-                        className="px-4 py-2 rounded-lg text-sm font-medium bg-[#3f3f46] hover:bg-[#52525b] text-white transition-all"
+                        className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] hover:brightness-95 transition-all"
                     >
                         {t('actions.close')}
                     </button>
@@ -295,35 +295,35 @@ export default function Dashboard() {
 
       {/* Error Log Modal */}
       {errorLogEnv && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-[#18181b] rounded-xl border border-[#3f3f46] shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-                <div className="p-6 border-b border-[#3f3f46] flex justify-between items-center">
-                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] backdrop-blur-sm">
+            <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
+                    <h3 className="text-xl font-bold text-[var(--text)] flex items-center gap-2">
                         <HelpCircle size={20} className="text-red-400" />
                         {t('dashboard.containerErrorLog')}
                     </h3>
-                    <button onClick={() => setErrorLogEnv(null)} className="text-gray-400 hover:text-white transition-colors">
+                    <button onClick={() => setErrorLogEnv(null)} className="text-[var(--text-muted)] hover:text-[var(--text)] transition-colors">
                         <X size={20} />
                     </button>
                 </div>
                 <div className="p-6">
-                    <p className="text-gray-400 text-sm mb-4">{t('dashboard.last50LinesFor', { name: errorLogEnv.name })}</p>
-                    <div className="bg-[#0f0f12] rounded-lg border border-[#3f3f46] p-4 max-h-[400px] overflow-y-auto">
+                    <p className="text-[var(--text-muted)] text-sm mb-4">{t('dashboard.last50LinesFor', { name: errorLogEnv.name })}</p>
+                    <div className="bg-[var(--bg)] rounded-lg border border-[var(--border)] p-4 max-h-[400px] overflow-y-auto">
                         {logLoading ? (
-                            <div className="flex items-center justify-center py-8 text-gray-500">
+                            <div className="flex items-center justify-center py-8 text-[var(--text-muted)]">
                                 <RefreshCw size={24} className="animate-spin" />
                             </div>
                         ) : (
-                            <pre className="text-xs font-mono text-gray-300 whitespace-pre-wrap font-ligatures-none">
+                            <pre className="text-xs font-mono text-[var(--text)] whitespace-pre-wrap font-ligatures-none">
                                 {errorLog || t('dashboard.noLogsAvailable')}
                             </pre>
                         )}
                     </div>
                 </div>
-                <div className="p-4 border-t border-[#3f3f46] bg-[#27272a]/50 flex justify-end">
+                <div className="p-4 border-t border-[var(--border)] bg-[var(--bg)] flex justify-end">
                     <button
                         onClick={() => setErrorLogEnv(null)}
-                        className="px-4 py-2 rounded-lg text-sm font-medium bg-[#3f3f46] hover:bg-[#52525b] text-white transition-all"
+                        className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] hover:brightness-95 transition-all"
                     >
                         {t('actions.close')}
                     </button>
@@ -334,30 +334,30 @@ export default function Dashboard() {
 
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold text-white">{t('dashboard.title')}</h2>
-          <p className="text-gray-400 mt-1">{t('dashboard.subtitle')}</p>
+          <h2 className="text-3xl font-bold text-[var(--text)]">{t('dashboard.title')}</h2>
+          <p className="text-[var(--text-muted)] mt-1">{t('dashboard.subtitle')}</p>
       </div>
     </div>
 
 
-      <div className="bg-[#27272a] rounded-xl border border-[#3f3f46] overflow-hidden">
-        <div className="p-6 border-b border-[#3f3f46] flex justify-between items-center">
-            <h3 className="text-xl font-bold text-white">{t('labels.instances')}</h3>
+      <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] overflow-hidden">
+        <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
+            <h3 className="text-xl font-bold text-[var(--text)]">{t('labels.instances')}</h3>
             <button
               onClick={() => fetchEnvironments({ showLoading: true })}
-              className="p-2 hover:bg-[#3f3f46] rounded-full text-gray-400 transition-colors"
+              className="p-2 hover:bg-[var(--bg)] rounded-full text-[var(--text-muted)] transition-colors"
             >
                 <RefreshCw size={18} className={loading && hasLoadedOnce ? "animate-spin" : ""} />
             </button>
         </div>
         <div className="w-full text-left">
             {!hasLoadedOnce && loading ? (
-                 <div className="p-8 text-center text-gray-500">{t('messages.loadingEnvironments')}</div>
+                 <div className="p-8 text-center text-[var(--text-muted)]">{t('messages.loadingEnvironments')}</div>
             ) : environments.length === 0 ? (
-                 <div className="p-8 text-center text-gray-500">{t('messages.noEnvironments')}</div>
+                 <div className="p-8 text-center text-[var(--text-muted)]">{t('messages.noEnvironments')}</div>
             ) : (
                 <table className="w-full">
-                    <thead className="bg-[#18181b] text-gray-400 text-sm uppercase">
+                    <thead className="bg-[var(--bg)] text-[var(--text-muted)] text-sm uppercase">
                         <tr>
                             <th className="px-6 py-4 font-medium">{t('labels.name')}</th>
                             <th className="px-6 py-4 font-medium">{t('labels.status')}</th>
@@ -366,15 +366,15 @@ export default function Dashboard() {
                             <th className="px-6 py-4 font-medium text-right">{t('labels.actions')}</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#3f3f46]">
+                    <tbody className="divide-y divide-[var(--border)]">
                         {[...environments]
                           .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
                           .map((env) => (
-                            <tr key={env.id} className="hover:bg-[#3f3f46]/50 transition-colors">
+                            <tr key={env.id} className="hover:bg-[var(--bg)] transition-colors">
                                 <td className="px-6 py-4">
                                   <div className="flex items-center gap-2">
-                                    <span className="text-white font-medium">{env.name}</span>
-                                    <span className="text-sm text-gray-500">({env.container_id || env.id.slice(0, 12)})</span>
+                                    <span className="text-[var(--text)] font-medium">{env.name}</span>
+                                    <span className="text-sm text-[var(--text-muted)]">({env.container_id || env.id.slice(0, 12)})</span>
                                   </div>
                                 </td>
                                 <td className="px-6 py-4">
@@ -406,7 +406,7 @@ export default function Dashboard() {
                                         )}
                                     </div>
                                 </td>
-                                <td className="px-6 py-4 text-gray-300">
+                                <td className="px-6 py-4 text-[var(--text)]">
                                     {env.status === 'stopped' || env.status === 'error' ? (
                                         <span>-</span>
                                     ) : (
@@ -415,44 +415,44 @@ export default function Dashboard() {
                                                 <button
                                                     onClick={() => copyEnvSshCommand(env)}
                                                     disabled={env.status !== 'running'}
-                                                    className="p-1 hover:bg-[#3f3f46] rounded text-gray-500 hover:text-blue-400 transition-colors"
+                                                    className="p-1 hover:bg-[var(--bg)] rounded text-[var(--text-muted)] hover:text-blue-400 transition-colors"
                                                 >
                                                     <SquareTerminal size={14} />
                                                 </button>
-                                                <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[#3f3f46] bg-[#18181b] px-2 py-1 text-xs text-gray-200 opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
+                                                <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-[var(--text)] opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
                                                     {env.status === 'running'
                                                       ? t('dashboard.copySshCommand', { port: env.ssh_port })
                                                       : t('dashboard.environmentMustBeRunning', { port: env.ssh_port })}
                                                 </div>
                                             </div>
-                                            <span className="text-gray-600">/</span>
+                                            <span className="text-[var(--text-muted)]">/</span>
                                             <div className="relative group">
                                                 <button
                                                     onClick={() => openJupyter(env)}
-                                                    className="p-1 hover:bg-[#3f3f46] rounded text-gray-500 hover:text-orange-400 transition-colors"
+                                                    className="p-1 hover:bg-[var(--bg)] rounded text-[var(--text-muted)] hover:text-orange-400 transition-colors"
                                                 >
                                                     <LayoutTemplate size={14} />
                                                 </button>
-                                                <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[#3f3f46] bg-[#18181b] px-2 py-1 text-xs text-gray-200 opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
+                                                <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-[var(--text)] opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
                                                     {t('dashboard.openJupyterLab')}
                                                 </div>
                                             </div>
-                                            <span className="text-gray-600">/</span>
+                                            <span className="text-[var(--text-muted)]">/</span>
                                             <div className="relative group">
                                                 <button
                                                     onClick={() => openCodeServer(env)}
-                                                    className="p-1 hover:bg-[#3f3f46] rounded text-gray-500 hover:text-cyan-400 transition-colors"
+                                                    className="p-1 hover:bg-[var(--bg)] rounded text-[var(--text-muted)] hover:text-cyan-400 transition-colors"
                                                 >
                                                     <Code2 size={14} />
                                                 </button>
-                                                <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[#3f3f46] bg-[#18181b] px-2 py-1 text-xs text-gray-200 opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
+                                                <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-[var(--text)] opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
                                                     {t('dashboard.openCodeServer')}
                                                 </div>
                                             </div>
                                         </div>
                                     )}
                                 </td>
-                                <td className="px-6 py-4 text-gray-300">
+                                <td className="px-6 py-4 text-[var(--text)]">
                                     {env.gpu_indices.length > 0 ? env.gpu_indices.join(', ') : "-"}
                                 </td>
                                 <td className="px-6 py-4 text-right space-x-2">
@@ -471,8 +471,8 @@ export default function Dashboard() {
                                                 disabled={actionLoading[env.id] || isTransitioning}
                                                 className={`p-2 rounded-lg transition-colors ${
                                                     isRunning
-                                                    ? "hover:bg-[#3f3f46] text-gray-400 hover:text-yellow-400"
-                                                    : "hover:bg-[#3f3f46] text-gray-400 hover:text-green-400"
+                                                    ? "hover:bg-[var(--bg)] text-[var(--text-muted)] hover:text-yellow-400"
+                                                    : "hover:bg-[var(--bg)] text-[var(--text-muted)] hover:text-green-400"
                                                 } ${actionLoading[env.id] ? "animate-pulse opacity-80" : ""}`}
                                                 title={isRunning ? t('dashboard.stopInstance') : t('dashboard.startInstance')}
                                             >
@@ -494,8 +494,8 @@ export default function Dashboard() {
                                         disabled={!env.mount_config || env.mount_config.length === 0}
                                         className={`p-2 rounded-lg transition-colors ${
                                             env.mount_config && env.mount_config.length > 0
-                                            ? "text-gray-400 hover:text-blue-400 hover:bg-blue-500/10"
-                                            : "text-gray-600 cursor-not-allowed opacity-30"
+                                            ? "text-[var(--text-muted)] hover:text-blue-400 hover:bg-blue-500/10"
+                                            : "text-[var(--text-muted)] cursor-not-allowed opacity-30"
                                         }`}
                                         title={env.mount_config && env.mount_config.length > 0 ? t('dashboard.viewVolumes') : t('dashboard.noVolumes')}
                                     >
@@ -510,8 +510,8 @@ export default function Dashboard() {
                                         disabled={!env.custom_ports || env.custom_ports.length === 0}
                                         className={`p-2 rounded-lg transition-colors ${
                                             env.custom_ports && env.custom_ports.length > 0
-                                            ? "text-gray-400 hover:text-cyan-400 hover:bg-cyan-500/10"
-                                            : "text-gray-600 cursor-not-allowed opacity-30"
+                                            ? "text-[var(--text-muted)] hover:text-cyan-400 hover:bg-cyan-500/10"
+                                            : "text-[var(--text-muted)] cursor-not-allowed opacity-30"
                                         }`}
                                         title={env.custom_ports && env.custom_ports.length > 0 ? t('dashboard.viewCustomPorts') : t('dashboard.noCustomPorts')}
                                     >
@@ -519,7 +519,7 @@ export default function Dashboard() {
                                     </button>
                                     <button
                                         onClick={() => setDeleteId(env.id)}
-                                        className="p-2 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-red-400 transition-colors"
+                                        className="p-2 hover:bg-[var(--bg)] rounded-lg text-[var(--text-muted)] hover:text-red-400 transition-colors"
                                         title={t('actions.delete')}
                                     >
                                         <Trash2 size={18} />
