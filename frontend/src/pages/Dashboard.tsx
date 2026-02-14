@@ -360,7 +360,7 @@ export default function Dashboard() {
                         <tr>
                             <th className="px-6 py-4 font-medium">Name</th>
                             <th className="px-6 py-4 font-medium">Status</th>
-                            <th className="px-6 py-4 font-medium">Ports (SSH/Jupyter/Code)</th>
+                            <th className="px-6 py-4 font-medium">Access</th>
                             <th className="px-6 py-4 font-medium">GPU</th>
                             <th className="px-6 py-4 font-medium text-right">Actions</th>
                         </tr>
@@ -409,39 +409,44 @@ export default function Dashboard() {
                                     {env.status === 'stopped' || env.status === 'error' ? (
                                         <span>-</span>
                                     ) : (
-                                        <div className="flex items-center gap-3">
-                                            <div className="flex items-center gap-1.5" title="SSH Port">
-                                                <span>{env.ssh_port}</span>
+                                        <div className="flex items-center gap-2">
+                                            <div className="relative group">
                                                 <button
                                                     onClick={() => copyEnvSshCommand(env)}
                                                     disabled={env.status !== 'running'}
                                                     className="p-1 hover:bg-[#3f3f46] rounded text-gray-500 hover:text-blue-400 transition-colors"
-                                                    title={env.status === 'running' ? 'Copy SSH command' : 'Environment must be running'}
                                                 >
                                                     <SquareTerminal size={14} />
                                                 </button>
+                                                <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[#3f3f46] bg-[#18181b] px-2 py-1 text-xs text-gray-200 opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
+                                                    {env.status === 'running'
+                                                      ? `Copy SSH command (port: ${env.ssh_port})`
+                                                      : `Environment must be running (port: ${env.ssh_port})`}
+                                                </div>
                                             </div>
                                             <span className="text-gray-600">/</span>
-                                            <div className="flex items-center gap-1.5" title="Jupyter Port">
-                                                <span>{env.jupyter_port}</span>
+                                            <div className="relative group">
                                                 <button
                                                     onClick={() => openJupyter(env)}
                                                     className="p-1 hover:bg-[#3f3f46] rounded text-gray-500 hover:text-orange-400 transition-colors"
-                                                    title="Open Jupyter Lab"
                                                 >
                                                     <LayoutTemplate size={14} />
                                                 </button>
+                                                <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[#3f3f46] bg-[#18181b] px-2 py-1 text-xs text-gray-200 opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
+                                                    Open Jupyter Lab
+                                                </div>
                                             </div>
                                             <span className="text-gray-600">/</span>
-                                            <div className="flex items-center gap-1.5" title="Code-server Port">
-                                                <span>{env.code_port}</span>
+                                            <div className="relative group">
                                                 <button
                                                     onClick={() => openCodeServer(env)}
                                                     className="p-1 hover:bg-[#3f3f46] rounded text-gray-500 hover:text-cyan-400 transition-colors"
-                                                    title="Open code-server"
                                                 >
                                                     <Code2 size={14} />
                                                 </button>
+                                                <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[#3f3f46] bg-[#18181b] px-2 py-1 text-xs text-gray-200 opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
+                                                    Open code-server
+                                                </div>
                                             </div>
                                         </div>
                                     )}
