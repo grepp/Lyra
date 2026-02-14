@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { Code2, HardDrive, HelpCircle, LayoutTemplate, Network, Play, RefreshCw, Square, SquareTerminal, Trash2, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Modal from '../components/Modal';
 import { useToast } from '../context/ToastContext';
 
@@ -34,6 +35,7 @@ const ENVS_CACHE_KEY = 'lyra.dashboard.environments';
 
 export default function Dashboard() {
   const { showToast } = useToast();
+  const { t } = useTranslation();
   const [environments, setEnvironments] = useState<Environment[]>(() => {
     try {
       if (typeof window === 'undefined') return [];
@@ -86,18 +88,18 @@ export default function Dashboard() {
     }
   };
 
-  const fetchErrorLogs = async (envId: string) => {
+  const fetchErrorLogs = useCallback(async (envId: string) => {
     try {
         setLogLoading(true);
         const res = await axios.get(`environments/${envId}/logs`);
         setErrorLog(res.data.logs);
     } catch (error) {
         console.error("Failed to fetch logs", error);
-        setErrorLog("Failed to fetch logs.");
+        setErrorLog(t('status.error'));
     } finally {
         setLogLoading(false);
     }
-  };
+  }, [t]);
 
   useEffect(() => {
     if (errorLogEnv) {
@@ -105,7 +107,7 @@ export default function Dashboard() {
     } else {
         setErrorLog("");
     }
-  }, [errorLogEnv]);
+  }, [errorLogEnv, fetchErrorLogs]);
 
   const deleteEnvironment = async () => {
     if (!deleteId) return;
@@ -195,8 +197,8 @@ export default function Dashboard() {
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
         onConfirm={deleteEnvironment}
-        title="Delete Environment"
-        message="Are you sure you want to delete this environment? This action cannot be undone and will permanently remove the container and data."
+        title={t('dashboard.deleteEnvironmentTitle')}
+        message={t('dashboard.deleteEnvironmentMessage')}
         isDestructive={true}
       />
 
@@ -207,16 +209,14 @@ export default function Dashboard() {
                 <div className="p-6 border-b border-[#3f3f46] flex justify-between items-center">
                     <h3 className="text-xl font-bold text-white flex items-center gap-2">
                         <HardDrive size={20} className="text-blue-400" />
-                        Volume Mounts
+                        {t('dashboard.volumeMounts')}
                     </h3>
                     <button onClick={() => setSelectedVolEnv(null)} className="text-gray-400 hover:text-white transition-colors">
                         <X size={20} />
                     </button>
                 </div>
                 <div className="p-6">
-                    <p className="text-gray-400 text-sm mb-4">
-                        Mounted volumes for <span className="text-white font-medium">{selectedVolEnv.name}</span>
-                    </p>
+                    <p className="text-gray-400 text-sm mb-4">{t('dashboard.mountedVolumesFor', { name: selectedVolEnv.name })}</p>
                     <div className="space-y-3">
                         {selectedVolEnv.mount_config.map((mount, idx) => (
                             <div key={idx} className="bg-[#27272a] p-3 rounded-lg border border-[#3f3f46] text-sm">
@@ -240,7 +240,7 @@ export default function Dashboard() {
                         onClick={() => setSelectedVolEnv(null)}
                         className="px-4 py-2 rounded-lg text-sm font-medium bg-[#3f3f46] hover:bg-[#52525b] text-white transition-all"
                     >
-                        Close
+                        {t('actions.close')}
                     </button>
                 </div>
             </div>
@@ -254,16 +254,14 @@ export default function Dashboard() {
                 <div className="p-6 border-b border-[#3f3f46] flex justify-between items-center">
                     <h3 className="text-xl font-bold text-white flex items-center gap-2">
                         <Network size={20} className="text-cyan-400" />
-                        Custom Port Mappings
+                        {t('dashboard.customPortMappings')}
                     </h3>
                     <button onClick={() => setSelectedPortEnv(null)} className="text-gray-400 hover:text-white transition-colors">
                         <X size={20} />
                     </button>
                 </div>
                 <div className="p-6">
-                    <p className="text-gray-400 text-sm mb-4">
-                        Custom ports for <span className="text-white font-medium">{selectedPortEnv.name}</span>
-                    </p>
+                    <p className="text-gray-400 text-sm mb-4">{t('dashboard.customPortsFor', { name: selectedPortEnv.name })}</p>
                     <div className="space-y-3">
                         {selectedPortEnv.custom_ports.map((mapping, idx) => (
                             <div key={`${mapping.host_port}-${mapping.container_port}-${idx}`} className="bg-[#27272a] p-3 rounded-lg border border-[#3f3f46] text-sm">
@@ -283,7 +281,7 @@ export default function Dashboard() {
                         onClick={() => setSelectedPortEnv(null)}
                         className="px-4 py-2 rounded-lg text-sm font-medium bg-[#3f3f46] hover:bg-[#52525b] text-white transition-all"
                     >
-                        Close
+                        {t('actions.close')}
                     </button>
                 </div>
             </div>
@@ -297,16 +295,14 @@ export default function Dashboard() {
                 <div className="p-6 border-b border-[#3f3f46] flex justify-between items-center">
                     <h3 className="text-xl font-bold text-white flex items-center gap-2">
                         <HelpCircle size={20} className="text-red-400" />
-                        Container Error Log
+                        {t('dashboard.containerErrorLog')}
                     </h3>
                     <button onClick={() => setErrorLogEnv(null)} className="text-gray-400 hover:text-white transition-colors">
                         <X size={20} />
                     </button>
                 </div>
                 <div className="p-6">
-                    <p className="text-gray-400 text-sm mb-4">
-                        Last 50 lines of logs for <span className="text-white font-medium">{errorLogEnv.name}</span>
-                    </p>
+                    <p className="text-gray-400 text-sm mb-4">{t('dashboard.last50LinesFor', { name: errorLogEnv.name })}</p>
                     <div className="bg-[#0f0f12] rounded-lg border border-[#3f3f46] p-4 max-h-[400px] overflow-y-auto">
                         {logLoading ? (
                             <div className="flex items-center justify-center py-8 text-gray-500">
@@ -314,7 +310,7 @@ export default function Dashboard() {
                             </div>
                         ) : (
                             <pre className="text-xs font-mono text-gray-300 whitespace-pre-wrap font-ligatures-none">
-                                {errorLog || "No logs available."}
+                                {errorLog || t('dashboard.noLogsAvailable')}
                             </pre>
                         )}
                     </div>
@@ -324,7 +320,7 @@ export default function Dashboard() {
                         onClick={() => setErrorLogEnv(null)}
                         className="px-4 py-2 rounded-lg text-sm font-medium bg-[#3f3f46] hover:bg-[#52525b] text-white transition-all"
                     >
-                        Close
+                        {t('actions.close')}
                     </button>
                 </div>
             </div>
@@ -333,15 +329,15 @@ export default function Dashboard() {
 
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold text-white">Dashboard</h2>
-          <p className="text-gray-400 mt-1">Manage your GPU virtual environments</p>
+          <h2 className="text-3xl font-bold text-white">{t('dashboard.title')}</h2>
+          <p className="text-gray-400 mt-1">{t('dashboard.subtitle')}</p>
       </div>
     </div>
 
 
       <div className="bg-[#27272a] rounded-xl border border-[#3f3f46] overflow-hidden">
         <div className="p-6 border-b border-[#3f3f46] flex justify-between items-center">
-            <h3 className="text-xl font-bold text-white">Instances</h3>
+            <h3 className="text-xl font-bold text-white">{t('labels.instances')}</h3>
             <button
               onClick={() => fetchEnvironments({ showLoading: true })}
               className="p-2 hover:bg-[#3f3f46] rounded-full text-gray-400 transition-colors"
@@ -351,18 +347,18 @@ export default function Dashboard() {
         </div>
         <div className="w-full text-left">
             {!hasLoadedOnce && loading ? (
-                 <div className="p-8 text-center text-gray-500">Loading environments...</div>
+                 <div className="p-8 text-center text-gray-500">{t('messages.loadingEnvironments')}</div>
             ) : environments.length === 0 ? (
-                 <div className="p-8 text-center text-gray-500">No environments found.</div>
+                 <div className="p-8 text-center text-gray-500">{t('messages.noEnvironments')}</div>
             ) : (
                 <table className="w-full">
                     <thead className="bg-[#18181b] text-gray-400 text-sm uppercase">
                         <tr>
-                            <th className="px-6 py-4 font-medium">Name</th>
-                            <th className="px-6 py-4 font-medium">Status</th>
-                            <th className="px-6 py-4 font-medium">Access</th>
-                            <th className="px-6 py-4 font-medium">GPU</th>
-                            <th className="px-6 py-4 font-medium text-right">Actions</th>
+                            <th className="px-6 py-4 font-medium">{t('labels.name')}</th>
+                            <th className="px-6 py-4 font-medium">{t('labels.status')}</th>
+                            <th className="px-6 py-4 font-medium">{t('labels.access')}</th>
+                            <th className="px-6 py-4 font-medium">{t('labels.gpu')}</th>
+                            <th className="px-6 py-4 font-medium text-right">{t('labels.actions')}</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-[#3f3f46]">
@@ -391,14 +387,14 @@ export default function Dashboard() {
                                                 'bg-red-500/10 text-red-500'
                                         }`}>
                                             {actionLoading[env.id]
-                                              ? (env.status === 'running' ? "Stopping" : "Starting")
+                                              ? (env.status === 'running' ? t('status.stopping') : t('status.starting'))
                                               : (env.status.charAt(0).toUpperCase() + env.status.slice(1))}
                                         </span>
                                         {env.status === 'error' && (
                                             <button
                                                 onClick={() => setErrorLogEnv(env)}
                                                 className="text-red-400 hover:text-red-300 transition-colors"
-                                                title="View Error Logs"
+                                                title={t('dashboard.viewErrorLogs')}
                                             >
                                                 <HelpCircle size={16} />
                                             </button>
@@ -420,8 +416,8 @@ export default function Dashboard() {
                                                 </button>
                                                 <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[#3f3f46] bg-[#18181b] px-2 py-1 text-xs text-gray-200 opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
                                                     {env.status === 'running'
-                                                      ? `Copy SSH command (port: ${env.ssh_port})`
-                                                      : `Environment must be running (port: ${env.ssh_port})`}
+                                                      ? t('dashboard.copySshCommand', { port: env.ssh_port })
+                                                      : t('dashboard.environmentMustBeRunning', { port: env.ssh_port })}
                                                 </div>
                                             </div>
                                             <span className="text-gray-600">/</span>
@@ -433,7 +429,7 @@ export default function Dashboard() {
                                                     <LayoutTemplate size={14} />
                                                 </button>
                                                 <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[#3f3f46] bg-[#18181b] px-2 py-1 text-xs text-gray-200 opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
-                                                    Open Jupyter Lab
+                                                    {t('dashboard.openJupyterLab')}
                                                 </div>
                                             </div>
                                             <span className="text-gray-600">/</span>
@@ -445,7 +441,7 @@ export default function Dashboard() {
                                                     <Code2 size={14} />
                                                 </button>
                                                 <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[#3f3f46] bg-[#18181b] px-2 py-1 text-xs text-gray-200 opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
-                                                    Open code-server
+                                                    {t('dashboard.openCodeServer')}
                                                 </div>
                                             </div>
                                         </div>
@@ -473,7 +469,7 @@ export default function Dashboard() {
                                                     ? "hover:bg-[#3f3f46] text-gray-400 hover:text-yellow-400"
                                                     : "hover:bg-[#3f3f46] text-gray-400 hover:text-green-400"
                                                 } ${actionLoading[env.id] ? "animate-pulse opacity-80" : ""}`}
-                                                title={isRunning ? "Stop Instance" : "Start Instance"}
+                                                title={isRunning ? t('dashboard.stopInstance') : t('dashboard.startInstance')}
                                             >
                                                 {actionLoading[env.id] || isTransitioning
                                                     ? <RefreshCw size={18} className="animate-spin" />
@@ -496,7 +492,7 @@ export default function Dashboard() {
                                             ? "text-gray-400 hover:text-blue-400 hover:bg-blue-500/10"
                                             : "text-gray-600 cursor-not-allowed opacity-30"
                                         }`}
-                                        title={env.mount_config && env.mount_config.length > 0 ? "View Volumes" : "No Volumes"}
+                                        title={env.mount_config && env.mount_config.length > 0 ? t('dashboard.viewVolumes') : t('dashboard.noVolumes')}
                                     >
                                         <HardDrive size={18} />
                                     </button>
@@ -512,14 +508,14 @@ export default function Dashboard() {
                                             ? "text-gray-400 hover:text-cyan-400 hover:bg-cyan-500/10"
                                             : "text-gray-600 cursor-not-allowed opacity-30"
                                         }`}
-                                        title={env.custom_ports && env.custom_ports.length > 0 ? "View Custom Ports" : "No Custom Ports"}
+                                        title={env.custom_ports && env.custom_ports.length > 0 ? t('dashboard.viewCustomPorts') : t('dashboard.noCustomPorts')}
                                     >
                                         <Network size={18} />
                                     </button>
                                     <button
                                         onClick={() => setDeleteId(env.id)}
                                         className="p-2 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-red-400 transition-colors"
-                                        title="Delete"
+                                        title={t('actions.delete')}
                                     >
                                         <Trash2 size={18} />
                                     </button>

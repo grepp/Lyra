@@ -1,19 +1,21 @@
 import clsx from 'clsx';
 import { FileCode, LayoutDashboard, PlusCircle, Settings, Terminal } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 
 const navItems = [
-  { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-  { name: 'Provisioning', path: '/provisioning', icon: PlusCircle },
-  { name: 'Terminal', path: '/terminal', icon: Terminal },
-  { name: 'Templates', path: '/templates', icon: FileCode },
-  { name: 'Settings', path: '/settings', icon: Settings },
+  { nameKey: 'nav.dashboard', path: '/', icon: LayoutDashboard },
+  { nameKey: 'nav.provisioning', path: '/provisioning', icon: PlusCircle },
+  { nameKey: 'nav.terminal', path: '/terminal', icon: Terminal },
+  { nameKey: 'nav.templates', path: '/templates', icon: FileCode },
+  { nameKey: 'nav.settings', path: '/settings', icon: Settings },
 ];
 
 export default function Sidebar() {
   const location = useLocation();
   const { appName } = useApp();
+  const { t } = useTranslation();
 
   return (
     <div className="w-64 bg-[#18181b] border-r border-[#27272a] flex flex-col">
@@ -37,7 +39,7 @@ export default function Sidebar() {
               )}
             >
               <item.icon size={20} className={clsx("mr-3", isActive ? "text-blue-400" : "group-hover:text-white")} />
-              <span className="font-medium">{item.name}</span>
+              <span className="font-medium">{t(item.nameKey)}</span>
             </Link>
           );
         })}
@@ -45,7 +47,7 @@ export default function Sidebar() {
       <div className="p-4 border-t border-[#27272a]">
         <div className="flex items-center gap-3 text-sm text-gray-500">
            <div className="w-2 h-2 rounded-full bg-green-500"></div>
-           System Status: Online
+           {t('system.status')}: {t('system.online')}
         </div>
       </div>
     </div>

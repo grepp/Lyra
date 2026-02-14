@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface ModalProps {
     isOpen: boolean;
@@ -19,6 +20,7 @@ export default function Modal({
     type = 'confirm',
     isDestructive = false
 }: ModalProps) {
+    const { t } = useTranslation();
     if (!isOpen) return null;
 
     return (
@@ -39,7 +41,7 @@ export default function Modal({
                             onClick={onClose}
                             className="px-4 py-2 text-sm font-medium text-gray-300 hover:text-white bg-[#3f3f46] hover:bg-[#52525b] rounded-lg transition-colors"
                         >
-                            Cancel
+                            {t('actions.cancel')}
                         </button>
                     )}
                     <button
@@ -53,7 +55,7 @@ export default function Modal({
                             : "bg-blue-600 hover:bg-blue-500 shadow-blue-600/20"
                         }`}
                     >
-                        {type === 'confirm' ? 'Confirm' : 'OK'}
+                        {type === 'confirm' ? t('actions.confirm') : t('actions.ok')}
                     </button>
                 </div>
             </div>

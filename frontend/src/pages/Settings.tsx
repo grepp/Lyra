@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { AlertCircle, CheckCircle2, FolderOpen, HardDrive, ImageIcon, Key, Lock, RefreshCw, Save, Server, Trash2 } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useApp } from '../context/AppContext';
 import { encrypt } from '../utils/crypto';
 
@@ -8,6 +9,7 @@ type StatusState = { type: 'idle' | 'loading' | 'success' | 'error'; message?: s
 
 export default function Settings() {
   const { appName, setAppName, faviconDataUrl, setFavicon, isLoading: appLoading } = useApp();
+  const { t } = useTranslation();
   const [localAppName, setLocalAppName] = useState(appName);
   const [localFaviconDataUrl, setLocalFaviconDataUrl] = useState(faviconDataUrl);
   const [appNameStatus, setAppNameStatus] = useState<StatusState>({ type: 'idle' });
@@ -359,7 +361,7 @@ export default function Settings() {
                   disabled={isLoading}
                   className="flex-1 bg-[#18181b] border border-[#3f3f46] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500 transition-all"
                 />
-                <button type="submit" disabled={isLoading} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2"><Save size={18} />Save</button>
+                <button type="submit" disabled={isLoading} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2"><Save size={18} />{t('actions.save')}</button>
               </div>
             </div>
 
@@ -386,7 +388,7 @@ export default function Settings() {
                     onClick={() => faviconInputRef.current?.click()}
                     className="bg-[#3f3f46] hover:bg-[#52525b] text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
                   >
-                    Select File
+                    {t('actions.selectFile')}
                   </button>
                   <button
                     type="button"
@@ -395,7 +397,7 @@ export default function Settings() {
                     className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Save size={14} />
-                    Save Favicon
+                    {t('actions.save')}
                   </button>
                   <button
                     type="button"
@@ -404,7 +406,7 @@ export default function Settings() {
                     className="bg-[#3f3f46] hover:bg-[#52525b] text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Trash2 size={14} />
-                    Reset
+                    {t('actions.reset')}
                   </button>
                 </div>
               </div>
@@ -484,7 +486,7 @@ export default function Settings() {
                         </div>
                         <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
                         <button type="button" onClick={() => fileInputRef.current?.click()} className="bg-[#3f3f46] hover:bg-[#52525b] text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all">
-                            <FolderOpen size={18} /> Select File
+                            <FolderOpen size={18} /> {t('actions.selectFile')}
                         </button>
                     </div>
                 </div>
@@ -514,7 +516,7 @@ export default function Settings() {
                   onClick={handleTestSsh}
                   className="w-full sm:w-auto bg-[#3f3f46] hover:bg-[#52525b] text-white px-6 py-2.5 rounded-lg font-medium transition-all"
                 >
-                  Test Connection
+                  {t('actions.testConnection')}
                 </button>
                 <button
                   type="submit"
@@ -522,7 +524,7 @@ export default function Settings() {
                   className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white px-10 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Save size={18} />
-                  Save Settings
+                  {t('actions.save')}
                 </button>
               </div>
             </div>
@@ -544,14 +546,14 @@ export default function Settings() {
             className="self-start sm:self-auto bg-[#3f3f46] hover:bg-[#52525b] text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all"
           >
             <RefreshCw size={14} className={isResourceLoading ? 'animate-spin' : ''} />
-            Refresh
+            {t('actions.refresh')}
           </button>
         </div>
 
         <div className="p-6 grid grid-cols-1 xl:grid-cols-2 gap-6">
           <div className="bg-[#18181b] border border-[#3f3f46] rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-white font-medium">Unused Images</h4>
+            <h4 className="text-white font-medium">Unused Images</h4>
               <select
                 value={imageMode}
                 onChange={(e) => setImageMode(e.target.value as 'dangling' | 'unused')}
@@ -578,7 +580,7 @@ export default function Settings() {
               onClick={runImagePrune}
               className="bg-red-600/90 hover:bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all"
             >
-              Cleanup Images
+              {t('resource.cleanupImages')}
             </button>
           </div>
 
@@ -614,7 +616,7 @@ export default function Settings() {
               className="bg-red-600/90 hover:bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={selectedVolumes.length === 0}
             >
-              Remove Selected Volumes
+              {t('resource.removeSelectedVolumes')}
             </button>
           </div>
 
@@ -627,7 +629,7 @@ export default function Settings() {
               onClick={runBuildCachePrune}
               className="bg-red-600/90 hover:bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all"
             >
-              Cleanup Build Cache
+              {t('resource.cleanupBuildCache')}
             </button>
           </div>
 
