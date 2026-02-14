@@ -187,32 +187,28 @@ def create_environment_task(self, environment_id):
             "image": image_name,
             "name": f"lyra-{env.name}-{env.id}",  # Ensure unique name
             "detach": True,
-            "environment": {
-                "JUPYTER_TOKEN": jupyter_token
-            },
-            "ports": {
-                '22/tcp': env.ssh_port,
-                '8888/tcp': env.jupyter_port,
-                '8080/tcp': env.code_port
-            },
+            "environment": {"JUPYTER_TOKEN": jupyter_token},
+            "ports": {'22/tcp': env.ssh_port, '8888/tcp': env.jupyter_port, '8080/tcp': env.code_port},
             # Keep container running with SSHD
             # Installing SSH server on the fly for demo purposes (NOT for production)
             "command": (
                 "sh -c \""
+                "export DEBIAN_FRONTEND=noninteractive && "
+                "dpkg --configure -a || true && "
                 "apt-get update && "
-                "apt-get install -y openssh-server python3-pip curl && "
+                "apt-get install -y --no-install-recommends openssh-server python3-pip curl && "
                 "mkdir -p /var/run/sshd && "
                 f"echo 'root:{env.root_password}' | chpasswd && "
-                "echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config && "
-                "python3 -m pip install --no-cache-dir jupyterlab && "
-                "curl -fsSL https://code-server.dev/install.sh -o /tmp/install-code-server.sh && "
-                "sh /tmp/install-code-server.sh && "
+                "grep -q '^PermitRootLogin yes' /etc/ssh/sshd_config || echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config && "  # noqa: E501
+                "python3 -m pip show jupyterlab >/dev/null 2>&1 || python3 -m pip install --no-cache-dir jupyterlab && "
+                "command -v code-server >/dev/null 2>&1 || "
+                "(curl -fsSL https://code-server.dev/install.sh -o /tmp/install-code-server.sh && sh /tmp/install-code-server.sh) && "  # noqa: E501
                 "/usr/sbin/sshd && "
                 "(code-server --bind-addr 0.0.0.0:8080 --auth none /root >/tmp/code-server.log 2>&1 &) && "
                 "python3 -m jupyterlab --ip=0.0.0.0 --port=8888 --no-browser --allow-root "
                 "--ServerApp.token=\"$JUPYTER_TOKEN\" "
                 "--NotebookApp.token=\"$JUPYTER_TOKEN\"\""
-            )
+            ),
         }
 
         # Add DeviceRequests if GPUs are requested and we are not mocking
@@ -224,13 +220,7 @@ def create_environment_task(self, environment_id):
             # Convert indices to string for device_ids
             gpu_ids = [str(i) for i in env.gpu_indices]
 
-            device_requests = [
-                docker.types.DeviceRequest(
-                    device_ids=gpu_ids,
-                    capabilities=[["gpu"]],
-                    driver="nvidia"
-                )
-            ]
+            device_requests = [docker.types.DeviceRequest(device_ids=gpu_ids, capabilities=[["gpu"]], driver="nvidia")]
             container_config["device_requests"] = device_requests
             # Note: Explicitly assigning specific GPU indices (e.g. device_ids=["0", "1"])
             # works if capabilities=[["gpu"]]. For simplicity with 'count', we assume generic allocation.
@@ -252,11 +242,7 @@ def create_environment_task(self, environment_id):
             container_config['volumes'] = volumes
 
         for attempt in range(CONTAINER_RUN_PORT_RETRIES):
-            ports_config = {
-                '22/tcp': env.ssh_port,
-                '8888/tcp': env.jupyter_port,
-                '8080/tcp': env.code_port
-            }
+            ports_config = {'22/tcp': env.ssh_port, '8888/tcp': env.jupyter_port, '8080/tcp': env.code_port}
             for mapping in custom_ports:
                 container_port = mapping.get("container_port")
                 host_port = mapping.get("host_port")

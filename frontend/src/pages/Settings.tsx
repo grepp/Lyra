@@ -1,16 +1,19 @@
 import axios from 'axios';
-import { AlertCircle, CheckCircle2, FolderOpen, Key, Lock, Save, Server } from 'lucide-react';
-import React, { useEffect, useRef, useState } from 'react';
+import { AlertCircle, CheckCircle2, FolderOpen, HardDrive, ImageIcon, Key, Lock, RefreshCw, Save, Server, Trash2 } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { encrypt } from '../utils/crypto';
 
 type StatusState = { type: 'idle' | 'loading' | 'success' | 'error'; message?: string };
 
 export default function Settings() {
-  const { appName, setAppName, isLoading: appLoading } = useApp();
+  const { appName, setAppName, faviconDataUrl, setFavicon, isLoading: appLoading } = useApp();
   const [localAppName, setLocalAppName] = useState(appName);
+  const [localFaviconDataUrl, setLocalFaviconDataUrl] = useState(faviconDataUrl);
   const [appNameStatus, setAppNameStatus] = useState<StatusState>({ type: 'idle' });
+  const [faviconStatus, setFaviconStatus] = useState<StatusState>({ type: 'idle' });
   const [sshStatus, setSshStatus] = useState<StatusState>({ type: 'idle' });
+  const [resourceStatus, setResourceStatus] = useState<StatusState>({ type: 'idle' });
 
   // SSH Settings State
   const [sshSettings, setSshSettings] = useState({
@@ -23,11 +26,22 @@ export default function Settings() {
     masterPassword: '', // Password for local encryption
   });
   const [isSettingsLoading, setIsSettingsLoading] = useState(true);
+  const [isResourceLoading, setIsResourceLoading] = useState(false);
+  const [imageMode, setImageMode] = useState<'dangling' | 'unused'>('dangling');
+  const [unusedImages, setUnusedImages] = useState<Array<{ id: string; short_id: string; tags: string[]; size: number }>>([]);
+  const [unusedVolumes, setUnusedVolumes] = useState<Array<{ name: string; mountpoint: string; driver: string }>>([]);
+  const [selectedVolumes, setSelectedVolumes] = useState<string[]>([]);
+  const [buildCache, setBuildCache] = useState<{ count: number; size: number }>({ count: 0, size: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const faviconInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setLocalAppName(appName);
   }, [appName]);
+
+  useEffect(() => {
+    setLocalFaviconDataUrl(faviconDataUrl);
+  }, [faviconDataUrl]);
 
   useEffect(() => {
     const fetchSshSettings = async () => {
@@ -65,6 +79,33 @@ export default function Settings() {
     fetchSshSettings();
   }, []);
 
+  const loadResourceData = useCallback(async (targetMode: 'dangling' | 'unused' = imageMode) => {
+    try {
+      setIsResourceLoading(true);
+      const [imagesRes, volumesRes, cacheRes] = await Promise.all([
+        axios.get(`resources/docker/images/unused?mode=${targetMode}`),
+        axios.get('resources/docker/volumes/unused'),
+        axios.get('resources/docker/build-cache'),
+      ]);
+      setUnusedImages(imagesRes.data?.images || []);
+      setUnusedVolumes(volumesRes.data?.volumes || []);
+      setBuildCache({
+        count: Number(cacheRes.data?.count || 0),
+        size: Number(cacheRes.data?.size || 0),
+      });
+      setSelectedVolumes((prev) => prev.filter((name) => (volumesRes.data?.volumes || []).some((v: { name: string }) => v.name === name)));
+    } catch (error) {
+      console.error(error);
+      setResourceStatus({ type: 'error', message: 'Failed to load resource management data.' });
+    } finally {
+      setIsResourceLoading(false);
+    }
+  }, [imageMode]);
+
+  useEffect(() => {
+    loadResourceData(imageMode);
+  }, [imageMode, loadResourceData]);
+
   const handleSaveName = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!localAppName.trim()) {
@@ -80,6 +121,56 @@ export default function Settings() {
     } catch (error) {
       console.error(error);
       setAppNameStatus({ type: 'error', message: 'Failed to update application name. Please try again.' });
+    }
+  };
+
+  const handleFaviconFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setFaviconStatus({ type: 'error', message: 'Please select an image file.' });
+      return;
+    }
+
+    if (file.size > 512 * 1024) {
+      setFaviconStatus({ type: 'error', message: 'Favicon must be 512KB or smaller.' });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = String(event.target?.result || '');
+      if (!dataUrl) return;
+      setLocalFaviconDataUrl(dataUrl);
+      setFaviconStatus({ type: 'idle' });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveFavicon = async () => {
+    try {
+      setFaviconStatus({ type: 'loading' });
+      await setFavicon(localFaviconDataUrl);
+      setFaviconStatus({ type: 'success', message: 'Favicon updated successfully!' });
+      setTimeout(() => setFaviconStatus({ type: 'idle' }), 3000);
+    } catch (error) {
+      console.error(error);
+      setFaviconStatus({ type: 'error', message: 'Failed to update favicon.' });
+    }
+  };
+
+  const handleResetFavicon = async () => {
+    try {
+      setFaviconStatus({ type: 'loading' });
+      setLocalFaviconDataUrl('');
+      await setFavicon('');
+      if (faviconInputRef.current) faviconInputRef.current.value = '';
+      setFaviconStatus({ type: 'success', message: 'Favicon reset to default.' });
+      setTimeout(() => setFaviconStatus({ type: 'idle' }), 3000);
+    } catch (error) {
+      console.error(error);
+      setFaviconStatus({ type: 'error', message: 'Failed to reset favicon.' });
     }
   };
 
@@ -179,6 +270,66 @@ export default function Settings() {
     }
   };
 
+  const formatBytes = (bytes: number) => {
+    if (bytes <= 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+  };
+
+  const runImagePrune = async () => {
+    try {
+      setResourceStatus({ type: 'loading', message: 'Cleaning unused images...' });
+      const res = await axios.post('resources/docker/images/prune', { mode: imageMode });
+      setResourceStatus({
+        type: 'success',
+        message: `Images cleaned: ${res.data?.removed_count || 0} removed, ${res.data?.skipped_count || 0} skipped.`,
+      });
+      await loadResourceData(imageMode);
+      setTimeout(() => setResourceStatus({ type: 'idle' }), 3000);
+    } catch (error) {
+      console.error(error);
+      setResourceStatus({ type: 'error', message: 'Failed to clean images.' });
+    }
+  };
+
+  const runVolumePrune = async () => {
+    if (selectedVolumes.length === 0) {
+      setResourceStatus({ type: 'error', message: 'Select at least one unused volume.' });
+      return;
+    }
+    try {
+      setResourceStatus({ type: 'loading', message: 'Removing selected volumes...' });
+      const res = await axios.post('resources/docker/volumes/prune', { volume_names: selectedVolumes });
+      setResourceStatus({
+        type: 'success',
+        message: `Volumes removed: ${res.data?.removed_count || 0} removed, ${res.data?.skipped_count || 0} skipped.`,
+      });
+      setSelectedVolumes([]);
+      await loadResourceData(imageMode);
+      setTimeout(() => setResourceStatus({ type: 'idle' }), 3000);
+    } catch (error) {
+      console.error(error);
+      setResourceStatus({ type: 'error', message: 'Failed to remove selected volumes.' });
+    }
+  };
+
+  const runBuildCachePrune = async () => {
+    try {
+      setResourceStatus({ type: 'loading', message: 'Cleaning build cache...' });
+      const res = await axios.post('resources/docker/build-cache/prune', { all: true });
+      setResourceStatus({
+        type: 'success',
+        message: `Build cache cleaned. Reclaimed ${formatBytes(Number(res.data?.space_reclaimed || 0))}.`,
+      });
+      await loadResourceData(imageMode);
+      setTimeout(() => setResourceStatus({ type: 'idle' }), 3000);
+    } catch (error) {
+      console.error(error);
+      setResourceStatus({ type: 'error', message: 'Failed to clean build cache.' });
+    }
+  };
+
   const isLoading = appLoading || isSettingsLoading;
 
   return (
@@ -211,6 +362,55 @@ export default function Settings() {
                 <button type="submit" disabled={isLoading} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2"><Save size={18} />Save</button>
               </div>
             </div>
+
+            <div className="space-y-3 pt-2">
+              <label className="block text-sm font-medium text-gray-300">Favicon</label>
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-lg border border-[#3f3f46] bg-[#18181b] flex items-center justify-center overflow-hidden">
+                  {localFaviconDataUrl ? (
+                    <img src={localFaviconDataUrl} alt="Favicon preview" className="h-8 w-8 object-contain" />
+                  ) : (
+                    <ImageIcon size={18} className="text-gray-500" />
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="file"
+                    ref={faviconInputRef}
+                    onChange={handleFaviconFileChange}
+                    accept="image/png,image/x-icon,image/svg+xml,image/jpeg,image/webp"
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => faviconInputRef.current?.click()}
+                    className="bg-[#3f3f46] hover:bg-[#52525b] text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                  >
+                    Select File
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveFavicon}
+                    disabled={isLoading}
+                    className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Save size={14} />
+                    Save Favicon
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetFavicon}
+                    disabled={isLoading}
+                    className="bg-[#3f3f46] hover:bg-[#52525b] text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 size={14} />
+                    Reset
+                  </button>
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-500">Recommended: square icon (32x32 or 64x64), max 512KB.</p>
+            </div>
+
             {appNameStatus.message && (
               <div className={`flex items-center gap-2 text-sm p-3 rounded-lg border ${
                 appNameStatus.type === 'success'
@@ -219,6 +419,16 @@ export default function Settings() {
               }`}>
                 {appNameStatus.type === 'success' ? <CheckCircle2 size={18} className="shrink-0" /> : <AlertCircle size={18} className="shrink-0" />}
                 <span className="font-medium">{appNameStatus.message}</span>
+              </div>
+            )}
+            {faviconStatus.message && (
+              <div className={`flex items-center gap-2 text-sm p-3 rounded-lg border ${
+                faviconStatus.type === 'success'
+                  ? 'text-green-400 bg-green-500/5 border-green-500/20'
+                  : 'text-red-400 bg-red-500/5 border-red-500/20'
+              }`}>
+                {faviconStatus.type === 'success' ? <CheckCircle2 size={18} className="shrink-0" /> : <AlertCircle size={18} className="shrink-0" />}
+                <span className="font-medium">{faviconStatus.message}</span>
               </div>
             )}
           </form>
@@ -319,6 +529,128 @@ export default function Settings() {
           </form>
         </section>
       </div>
+
+      <section className="bg-[#27272a] rounded-xl border border-[#3f3f46] overflow-hidden shadow-xl">
+        <div className="p-6 border-b border-[#3f3f46] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+              Resource Management
+            </h3>
+            <p className="text-sm text-gray-400 mt-1">Cleanup only targets resources not referenced by any running or stopped container.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => loadResourceData(imageMode)}
+            className="self-start sm:self-auto bg-[#3f3f46] hover:bg-[#52525b] text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all"
+          >
+            <RefreshCw size={14} className={isResourceLoading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
+
+        <div className="p-6 grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div className="bg-[#18181b] border border-[#3f3f46] rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-white font-medium">Unused Images</h4>
+              <select
+                value={imageMode}
+                onChange={(e) => setImageMode(e.target.value as 'dangling' | 'unused')}
+                className="bg-[#27272a] border border-[#3f3f46] rounded-lg px-2 py-1 text-xs text-gray-200"
+              >
+                <option value="dangling">Dangling Only</option>
+                <option value="unused">All Unused</option>
+              </select>
+            </div>
+            <p className="text-xs text-gray-400">{unusedImages.length} candidate images</p>
+            <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
+              {unusedImages.length === 0 ? (
+                <p className="text-xs text-gray-500">No removable images.</p>
+              ) : unusedImages.map((img) => (
+                <div key={img.id} className="text-xs border border-[#3f3f46] rounded-lg p-2 text-gray-300">
+                  <div className="font-mono text-[11px] text-gray-200">{img.short_id}</div>
+                  <div className="truncate">{(img.tags && img.tags.length > 0 ? img.tags.join(', ') : '<none>:<none>')}</div>
+                  <div className="text-gray-500">{formatBytes(img.size)}</div>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={runImagePrune}
+              className="bg-red-600/90 hover:bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all"
+            >
+              Cleanup Images
+            </button>
+          </div>
+
+          <div className="bg-[#18181b] border border-[#3f3f46] rounded-xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-white font-medium flex items-center gap-2"><HardDrive size={15} /> Unused Volumes</h4>
+              <span className="text-xs text-gray-400">{unusedVolumes.length} candidates</span>
+            </div>
+            <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
+              {unusedVolumes.length === 0 ? (
+                <p className="text-xs text-gray-500">No removable volumes.</p>
+              ) : unusedVolumes.map((vol) => (
+                <label key={vol.name} className="flex items-start gap-2 text-xs border border-[#3f3f46] rounded-lg p-2 text-gray-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedVolumes.includes(vol.name)}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedVolumes((prev) => [...prev, vol.name]);
+                      else setSelectedVolumes((prev) => prev.filter((v) => v !== vol.name));
+                    }}
+                    className="mt-0.5"
+                  />
+                  <div className="min-w-0">
+                    <div className="font-mono text-[11px] text-gray-200 break-all">{vol.name}</div>
+                    <div className="text-gray-500 break-all">{vol.mountpoint}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={runVolumePrune}
+              className="bg-red-600/90 hover:bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={selectedVolumes.length === 0}
+            >
+              Remove Selected Volumes
+            </button>
+          </div>
+
+          <div className="bg-[#18181b] border border-[#3f3f46] rounded-xl p-4 space-y-3">
+            <h4 className="text-white font-medium">Build Cache</h4>
+            <div className="text-sm text-gray-300">Entries: <span className="font-mono">{buildCache.count}</span></div>
+            <div className="text-sm text-gray-300">Size: <span className="font-mono">{formatBytes(buildCache.size)}</span></div>
+            <button
+              type="button"
+              onClick={runBuildCachePrune}
+              className="bg-red-600/90 hover:bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all"
+            >
+              Cleanup Build Cache
+            </button>
+          </div>
+
+        </div>
+
+        {resourceStatus.message && (
+          <div className={`mx-6 mb-6 flex items-center gap-2 text-sm p-3 rounded-lg border ${
+            resourceStatus.type === 'success'
+              ? 'text-green-400 bg-green-500/5 border-green-500/20'
+              : resourceStatus.type === 'error'
+                ? 'text-red-400 bg-red-500/5 border-red-500/20'
+                : 'text-blue-400 bg-blue-500/5 border-blue-500/20'
+          }`}>
+            {resourceStatus.type === 'success'
+              ? <CheckCircle2 size={18} className="shrink-0" />
+              : resourceStatus.type === 'error'
+                ? <AlertCircle size={18} className="shrink-0" />
+                : <RefreshCw size={18} className="shrink-0 animate-spin" />}
+            <span className="font-medium">{resourceStatus.message}</span>
+          </div>
+        )}
+      </section>
+
     </div>
   );
 }
