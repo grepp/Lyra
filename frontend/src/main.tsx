@@ -15,6 +15,9 @@ if (typeof document !== 'undefined') {
   if (typeof window !== 'undefined') {
     try {
       const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+      if (stored === 'auto') {
+        isDarkTheme = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      }
       if (stored === 'light') isDarkTheme = false;
       if (stored === 'dark') isDarkTheme = true;
     } catch {

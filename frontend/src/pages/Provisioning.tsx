@@ -25,7 +25,7 @@ export default function Provisioning() {
   const location = useLocation();
   const { showToast } = useToast();
   const { t } = useTranslation();
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -262,7 +262,7 @@ export default function Provisioning() {
                                 if (templateErrors.name) setTemplateErrors({});
                             }}
                             className={clsx(
-                                "w-full bg-[var(--bg)] border rounded-lg px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-1 transition-all",
+                                "w-full bg-[var(--bg-soft)] border rounded-lg px-4 py-2 text-[var(--text)] focus:outline-none focus:ring-1 transition-all",
                                 templateErrors.name
                                     ? "border-red-500/50 focus:border-red-500 focus:ring-red-500/20"
                                     : "border-[var(--border)] focus:border-blue-500 focus:ring-blue-500"
@@ -279,12 +279,12 @@ export default function Provisioning() {
                         <textarea
                             value={templateDesc}
                             onChange={(e) => setTemplateDesc(e.target.value)}
-                            className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-lg px-4 py-2 text-[var(--text)] focus:border-blue-500 focus:outline-none resize-none h-24"
+                            className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-4 py-2 text-[var(--text)] focus:border-blue-500 focus:outline-none resize-none h-24"
                             placeholder={t('provisioning.optionalDescription')}
                         />
                     </div>
                 </div>
-                <div className="p-4 border-t border-[var(--border)] flex justify-end gap-3 bg-[var(--bg)]">
+                <div className="p-4 border-t border-[var(--border)] flex justify-end gap-3 bg-[var(--bg-soft)]">
                     <button
                         onClick={() => {
                             setIsSaveModalOpen(false);
@@ -340,7 +340,7 @@ export default function Provisioning() {
                 onChange={(e) => setName(e.target.value)}
                 placeholder={t('provisioning.environmentNamePlaceholder')}
                 className={clsx(
-                  "w-full bg-[var(--bg)] border rounded-lg px-4 py-2.5 text-[var(--text)] focus:outline-none focus:ring-1 transition-all",
+                  "w-full bg-[var(--bg-soft)] border rounded-lg px-4 py-2.5 text-[var(--text)] focus:outline-none focus:ring-1 transition-all",
                   errors.name
                     ? "border-red-500/50 focus:border-red-500 focus:ring-red-500/20"
                     : "border-[var(--border)] focus:border-blue-500 focus:ring-blue-500"
@@ -355,7 +355,7 @@ export default function Provisioning() {
               <label className="text-sm font-medium text-[var(--text-muted)]">{t('provisioning.rootPassword')}</label>
               <div
                 className={clsx(
-                  "w-full bg-[var(--bg)] border rounded-lg px-3 py-1.5 flex items-center gap-2 focus-within:ring-1 transition-all",
+                  "w-full bg-[var(--bg-soft)] border rounded-lg px-3 py-1.5 flex items-center gap-2 focus-within:ring-1 transition-all",
                   errors.password
                     ? "border-red-500/50 focus-within:border-red-500 focus-within:ring-red-500/20"
                     : "border-[var(--border)] focus-within:border-blue-500 focus-within:ring-blue-500"
@@ -370,7 +370,7 @@ export default function Provisioning() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((prev) => !prev)}
-                  className="shrink-0 p-1 rounded text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg)] transition-colors"
+                  className="shrink-0 p-1 rounded text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg-soft)] transition-colors"
                   title={showPassword ? t('provisioning.hidePassword') : t('provisioning.showPassword')}
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -405,7 +405,7 @@ export default function Provisioning() {
                     onChange={(e) => setGpuCount(parseInt(e.target.value))}
                     className={clsx(
                       "w-full h-2 rounded-lg appearance-none border border-[var(--border)]",
-                      (!maxGpus || maxGpus === 0) ? "bg-[var(--bg)] cursor-not-allowed" : "bg-[var(--bg)] cursor-pointer accent-purple-500"
+                      (!maxGpus || maxGpus === 0) ? "bg-[var(--bg-soft)] cursor-not-allowed" : "bg-[var(--bg-soft)] cursor-pointer accent-purple-500"
                     )}
                   />
                   <div className="flex justify-between text-xs text-[var(--text-muted)] mt-2">
@@ -427,14 +427,14 @@ export default function Provisioning() {
                 <span className="w-1 h-5 bg-green-500 rounded-full"></span>
                 {t('provisioning.volumeMounts')}
                 </h3>
-                <button onClick={handleAddMount} className="p-1 hover:bg-[var(--bg)] rounded text-[var(--text-muted)] hover:text-[var(--text)] transition-colors">
+                <button onClick={handleAddMount} className="p-1 hover:bg-[var(--bg-soft)] rounded text-[var(--text-muted)] hover:text-[var(--text)] transition-colors">
                     <Plus size={18} />
                 </button>
             </div>
 
             <div className="space-y-3">
               {mounts.map((mount, idx) => (
-                <div key={idx} className="bg-[var(--bg)] p-4 rounded-xl border border-[var(--border)] space-y-3 group transition-all hover:brightness-95">
+                <div key={idx} className="bg-[var(--bg-soft)] p-4 rounded-xl border border-[var(--border)] space-y-3 group transition-all hover:brightness-95">
                     <div className="flex gap-2 items-center">
                         <div className="flex-1 relative min-w-0">
                              <FolderOpen size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
@@ -479,7 +479,7 @@ export default function Provisioning() {
                 </div>
               ))}
               {mounts.length === 0 && (
-                <p className="text-sm text-[var(--text-muted)] text-center py-4 bg-[var(--bg)] rounded-lg border border-dashed border-[var(--border)]">
+                <p className="text-sm text-[var(--text-muted)] text-center py-4 bg-[var(--bg-soft)] rounded-lg border border-dashed border-[var(--border)]">
                     {t('provisioning.noVolumesMounted')}
                 </p>
               )}
@@ -496,7 +496,7 @@ export default function Provisioning() {
                 <button
                   onClick={handleAddCustomPort}
                   disabled={isAllocatingPort}
-                  className="p-1 hover:bg-[var(--bg)] rounded text-[var(--text-muted)] hover:text-[var(--text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-1 hover:bg-[var(--bg-soft)] rounded text-[var(--text-muted)] hover:text-[var(--text)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   title={t('provisioning.autoAllocateCustomPort')}
                 >
                   <Plus size={18} className={isAllocatingPort ? 'animate-spin' : ''} />
@@ -507,7 +507,7 @@ export default function Provisioning() {
               {customPorts.map((mapping, idx) => (
                 <div
                   key={`${mapping.host_port}-${mapping.container_port}-${idx}`}
-                  className="bg-[var(--bg)] p-4 rounded-xl border border-[var(--border)] flex items-center justify-between gap-3"
+                  className="bg-[var(--bg-soft)] p-4 rounded-xl border border-[var(--border)] flex items-center justify-between gap-3"
                 >
                   <div className="font-mono text-sm text-[var(--text)] min-w-0 overflow-x-auto whitespace-nowrap scrollbar-hide">
                     <span className="text-sky-500">{mapping.host_port}</span>
@@ -524,7 +524,7 @@ export default function Provisioning() {
                 </div>
               ))}
               {customPorts.length === 0 && (
-                <p className="text-sm text-[var(--text-muted)] text-center py-4 bg-[var(--bg)] rounded-lg border border-dashed border-[var(--border)]">
+                <p className="text-sm text-[var(--text-muted)] text-center py-4 bg-[var(--bg-soft)] rounded-lg border border-dashed border-[var(--border)]">
                   {t('provisioning.noCustomPortsAllocated')}
                 </p>
               )}
@@ -535,7 +535,7 @@ export default function Provisioning() {
 
         {/* Right Column: Dockerfile Editor */}
         <div className="lg:col-span-2 flex flex-col h-[800px] bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] overflow-hidden">
-             <div className="px-6 py-4 border-b border-[var(--border)] flex justify-between items-center bg-[var(--bg)]">
+             <div className="px-6 py-4 border-b border-[var(--border)] flex justify-between items-center bg-[var(--bg-soft)]">
                 <div className="flex items-center gap-3">
                     <div className="p-1.5 bg-blue-500/10 rounded-md">
                         <span className="text-blue-400 font-mono text-sm font-bold">{t('provisioning.dockerfile')}</span>
@@ -545,14 +545,14 @@ export default function Provisioning() {
                 <div className="flex gap-2">
                     <button
                         onClick={() => setIsLoadModalOpen(true)}
-                        className="px-3 py-1.5 bg-[var(--bg)] hover:brightness-95 text-[var(--text)] rounded-md flex items-center gap-2 transition-colors border border-[var(--border)] text-xs font-medium"
+                        className="px-3 py-1.5 bg-[var(--bg-soft)] hover:brightness-95 text-[var(--text)] rounded-md flex items-center gap-2 transition-colors border border-[var(--border)] text-xs font-medium"
                     >
                         <Upload size={14} />
                         <span>{t('actions.load')}</span>
                     </button>
                     <button
                         onClick={() => setIsSaveModalOpen(true)}
-                        className="px-3 py-1.5 bg-[var(--bg)] hover:brightness-95 text-[var(--text)] rounded-md flex items-center gap-2 transition-colors border border-[var(--border)] text-xs font-medium"
+                        className="px-3 py-1.5 bg-[var(--bg-soft)] hover:brightness-95 text-[var(--text)] rounded-md flex items-center gap-2 transition-colors border border-[var(--border)] text-xs font-medium"
                     >
                         <Save size={14} />
                         <span>{t('actions.save')}</span>
@@ -563,7 +563,7 @@ export default function Provisioning() {
                 <Editor
                     height="100%"
                     defaultLanguage="dockerfile"
-                    theme={theme === 'dark' ? 'vs-dark' : 'vs'}
+                    theme={resolvedTheme === 'dark' ? 'vs-dark' : 'vs'}
                     value={dockerfile}
                     onChange={(value) => setDockerfile(value || '')}
                     options={{
@@ -601,7 +601,7 @@ export default function Provisioning() {
                         </div>
                     ) : (
                         templates.map((template) => (
-                             <div key={template.id} className="bg-[var(--bg)] rounded-lg border border-[var(--border)] p-4 flex items-center justify-between group hover:brightness-95 transition-all">
+                             <div key={template.id} className="bg-[var(--bg-soft)] rounded-lg border border-[var(--border)] p-4 flex items-center justify-between group hover:brightness-95 transition-all">
                                 <div className="min-w-0 flex-1 mr-4">
                                     <div className="flex items-center gap-2 mb-1">
                                         <h4 className="font-bold text-[var(--text)] truncate">{template.name}</h4>
@@ -632,7 +632,7 @@ export default function Provisioning() {
                     )}
                 </div>
 
-                <div className="p-4 border-t border-[var(--border)] bg-[var(--bg)] flex justify-end">
+                <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-soft)] flex justify-end">
                     <button
                         onClick={() => setIsLoadModalOpen(false)}
                         className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text)] hover:brightness-95 transition-colors"

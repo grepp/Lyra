@@ -35,11 +35,11 @@ export default function Modal({
                 <div className="p-6">
                     <p className="text-[var(--text-muted)]">{message}</p>
                 </div>
-                <div className="flex justify-end gap-3 rounded-b-xl border-t border-[var(--border)] bg-[var(--bg)] p-6">
+                <div className="flex justify-end gap-3 rounded-b-xl border-t border-[var(--border)] bg-[var(--bg-soft)] p-6">
                     {type === 'confirm' && (
                         <button
                             onClick={onClose}
-                            className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-4 py-2 text-sm font-medium text-[var(--text)] transition-colors hover:brightness-95"
+                            className="rounded-lg border border-[var(--border)] bg-[var(--bg-soft)] px-4 py-2 text-sm font-medium text-[var(--text)] transition-colors hover:brightness-95"
                         >
                             {t('actions.cancel')}
                         </button>

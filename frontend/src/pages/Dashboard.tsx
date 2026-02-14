@@ -224,7 +224,7 @@ export default function Dashboard() {
                     <p className="text-[var(--text-muted)] text-sm mb-4">{t('dashboard.mountedVolumesFor', { name: selectedVolEnv.name })}</p>
                     <div className="space-y-3">
                         {selectedVolEnv.mount_config.map((mount, idx) => (
-                            <div key={idx} className="bg-[var(--bg)] p-3 rounded-lg border border-[var(--border)] text-sm">
+                            <div key={idx} className="bg-[var(--bg-soft)] p-3 rounded-lg border border-[var(--border)] text-sm">
                                 <div className="flex items-center gap-2 mb-1">
                                     <span className="text-xs font-bold text-blue-400 uppercase w-10 shrink-0">{t('dashboard.hostLabel')}</span>
                                     <span className="text-[var(--text)] font-mono overflow-x-auto whitespace-nowrap flex-1 scrollbar-hide">{mount.host_path}</span>
@@ -240,10 +240,10 @@ export default function Dashboard() {
                         ))}
                     </div>
                 </div>
-                <div className="p-4 border-t border-[var(--border)] bg-[var(--bg)] flex justify-end">
+                <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-soft)] flex justify-end">
                     <button
                         onClick={() => setSelectedVolEnv(null)}
-                        className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] hover:brightness-95 transition-all"
+                        className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg-soft)] text-[var(--text)] hover:brightness-95 transition-all"
                     >
                         {t('actions.close')}
                     </button>
@@ -269,7 +269,7 @@ export default function Dashboard() {
                     <p className="text-[var(--text-muted)] text-sm mb-4">{t('dashboard.customPortsFor', { name: selectedPortEnv.name })}</p>
                     <div className="space-y-3">
                         {selectedPortEnv.custom_ports.map((mapping, idx) => (
-                            <div key={`${mapping.host_port}-${mapping.container_port}-${idx}`} className="bg-[var(--bg)] p-3 rounded-lg border border-[var(--border)] text-sm">
+                            <div key={`${mapping.host_port}-${mapping.container_port}-${idx}`} className="bg-[var(--bg-soft)] p-3 rounded-lg border border-[var(--border)] text-sm">
                                 <div className="flex items-center gap-2">
                                     <span className="text-xs font-bold text-cyan-400 uppercase w-14 shrink-0">{t('dashboard.hostLabel')}</span>
                                     <span className="text-[var(--text)] font-mono">{mapping.host_port}</span>
@@ -281,10 +281,10 @@ export default function Dashboard() {
                         ))}
                     </div>
                 </div>
-                <div className="p-4 border-t border-[var(--border)] bg-[var(--bg)] flex justify-end">
+                <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-soft)] flex justify-end">
                     <button
                         onClick={() => setSelectedPortEnv(null)}
-                        className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] hover:brightness-95 transition-all"
+                        className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg-soft)] text-[var(--text)] hover:brightness-95 transition-all"
                     >
                         {t('actions.close')}
                     </button>
@@ -308,7 +308,7 @@ export default function Dashboard() {
                 </div>
                 <div className="p-6">
                     <p className="text-[var(--text-muted)] text-sm mb-4">{t('dashboard.last50LinesFor', { name: errorLogEnv.name })}</p>
-                    <div className="bg-[var(--bg)] rounded-lg border border-[var(--border)] p-4 max-h-[400px] overflow-y-auto">
+                    <div className="bg-[var(--bg-soft)] rounded-lg border border-[var(--border)] p-4 max-h-[400px] overflow-y-auto">
                         {logLoading ? (
                             <div className="flex items-center justify-center py-8 text-[var(--text-muted)]">
                                 <RefreshCw size={24} className="animate-spin" />
@@ -320,10 +320,10 @@ export default function Dashboard() {
                         )}
                     </div>
                 </div>
-                <div className="p-4 border-t border-[var(--border)] bg-[var(--bg)] flex justify-end">
+                <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-soft)] flex justify-end">
                     <button
                         onClick={() => setErrorLogEnv(null)}
-                        className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] hover:brightness-95 transition-all"
+                        className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg-soft)] text-[var(--text)] hover:brightness-95 transition-all"
                     >
                         {t('actions.close')}
                     </button>
@@ -345,7 +345,7 @@ export default function Dashboard() {
             <h3 className="text-xl font-bold text-[var(--text)]">{t('labels.instances')}</h3>
             <button
               onClick={() => fetchEnvironments({ showLoading: true })}
-              className="p-2 hover:bg-[var(--bg)] rounded-full text-[var(--text-muted)] transition-colors"
+              className="p-2 hover:bg-[var(--bg-soft)] rounded-full text-[var(--text-muted)] transition-colors"
             >
                 <RefreshCw size={18} className={loading && hasLoadedOnce ? "animate-spin" : ""} />
             </button>
@@ -357,7 +357,7 @@ export default function Dashboard() {
                  <div className="p-8 text-center text-[var(--text-muted)]">{t('messages.noEnvironments')}</div>
             ) : (
                 <table className="w-full">
-                    <thead className="bg-[var(--bg)] text-[var(--text-muted)] text-sm uppercase">
+                    <thead className="bg-[var(--bg-soft)] text-[var(--text-muted)] text-sm uppercase">
                         <tr>
                             <th className="px-6 py-4 font-medium">{t('labels.name')}</th>
                             <th className="px-6 py-4 font-medium">{t('labels.status')}</th>
@@ -370,7 +370,7 @@ export default function Dashboard() {
                         {[...environments]
                           .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
                           .map((env) => (
-                            <tr key={env.id} className="hover:bg-[var(--bg)] transition-colors">
+                            <tr key={env.id} className="hover:bg-[var(--bg-soft)] transition-colors">
                                 <td className="px-6 py-4">
                                   <div className="flex items-center gap-2">
                                     <span className="text-[var(--text)] font-medium">{env.name}</span>
@@ -415,7 +415,7 @@ export default function Dashboard() {
                                                 <button
                                                     onClick={() => copyEnvSshCommand(env)}
                                                     disabled={env.status !== 'running'}
-                                                    className="p-1 hover:bg-[var(--bg)] rounded text-[var(--text-muted)] hover:text-blue-400 transition-colors"
+                                                    className="p-1 hover:bg-[var(--bg-soft)] rounded text-[var(--text-muted)] hover:text-blue-400 transition-colors"
                                                 >
                                                     <SquareTerminal size={14} />
                                                 </button>
@@ -429,7 +429,7 @@ export default function Dashboard() {
                                             <div className="relative group">
                                                 <button
                                                     onClick={() => openJupyter(env)}
-                                                    className="p-1 hover:bg-[var(--bg)] rounded text-[var(--text-muted)] hover:text-orange-400 transition-colors"
+                                                    className="p-1 hover:bg-[var(--bg-soft)] rounded text-[var(--text-muted)] hover:text-orange-400 transition-colors"
                                                 >
                                                     <LayoutTemplate size={14} />
                                                 </button>
@@ -441,7 +441,7 @@ export default function Dashboard() {
                                             <div className="relative group">
                                                 <button
                                                     onClick={() => openCodeServer(env)}
-                                                    className="p-1 hover:bg-[var(--bg)] rounded text-[var(--text-muted)] hover:text-cyan-400 transition-colors"
+                                                    className="p-1 hover:bg-[var(--bg-soft)] rounded text-[var(--text-muted)] hover:text-cyan-400 transition-colors"
                                                 >
                                                     <Code2 size={14} />
                                                 </button>
@@ -471,8 +471,8 @@ export default function Dashboard() {
                                                 disabled={actionLoading[env.id] || isTransitioning}
                                                 className={`p-2 rounded-lg transition-colors ${
                                                     isRunning
-                                                    ? "hover:bg-[var(--bg)] text-[var(--text-muted)] hover:text-yellow-400"
-                                                    : "hover:bg-[var(--bg)] text-[var(--text-muted)] hover:text-green-400"
+                                                    ? "hover:bg-[var(--bg-soft)] text-[var(--text-muted)] hover:text-yellow-400"
+                                                    : "hover:bg-[var(--bg-soft)] text-[var(--text-muted)] hover:text-green-400"
                                                 } ${actionLoading[env.id] ? "animate-pulse opacity-80" : ""}`}
                                                 title={isRunning ? t('dashboard.stopInstance') : t('dashboard.startInstance')}
                                             >
@@ -519,7 +519,7 @@ export default function Dashboard() {
                                     </button>
                                     <button
                                         onClick={() => setDeleteId(env.id)}
-                                        className="p-2 hover:bg-[var(--bg)] rounded-lg text-[var(--text-muted)] hover:text-red-400 transition-colors"
+                                        className="p-2 hover:bg-[var(--bg-soft)] rounded-lg text-[var(--text-muted)] hover:text-red-400 transition-colors"
                                         title={t('actions.delete')}
                                     >
                                         <Trash2 size={18} />

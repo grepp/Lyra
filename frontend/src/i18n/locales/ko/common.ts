@@ -170,6 +170,7 @@ const koCommon = {
     languageEnglish: '영어',
     languageKorean: '한국어',
     theme: '테마',
+    themeAuto: '자동 (시스템)',
     themeDark: '블랙',
     themeLight: '화이트',
     favicon: '파비콘',

@@ -35,7 +35,7 @@ export default function Sidebar() {
                 "flex items-center px-4 py-3 rounded-lg transition-all duration-200 group",
                 isActive
                   ? "bg-[color-mix(in_oklab,var(--primary)_14%,transparent)] text-[var(--primary)]"
-                  : "text-[var(--text-muted)] hover:bg-[var(--bg)] hover:text-[var(--text)]"
+                  : "text-[var(--text-muted)] hover:bg-[var(--bg-soft)] hover:text-[var(--text)]"
               )}
             >
               <item.icon size={20} className={clsx("mr-3", isActive ? "text-[var(--primary)]" : "text-[var(--text-muted)] group-hover:text-[var(--text)]")} />

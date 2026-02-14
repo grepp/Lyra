@@ -8,6 +8,7 @@
 @layer base {
   :root {
     --bg: #e4e7ec;
+    --bg-soft: #edf1f6;
     --bg-elevated: #f7f8fb;
     --surface: #eceff4;
     --overlay: rgb(15 23 42 / 0.38);
@@ -24,6 +25,7 @@
 
   html.theme-dark {
     --bg: #121316;
+    --bg-soft: #1a1c22;
     --bg-elevated: #23242b;
     --surface: #1a1b20;
     --overlay: rgb(0 0 0 / 0.58);

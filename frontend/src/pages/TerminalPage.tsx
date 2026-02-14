@@ -200,7 +200,7 @@ export default function TerminalPage() {
               </header>
 
               <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] p-12 text-center text-[var(--text-muted)] flex flex-col items-center gap-4">
-                  <div className="p-4 bg-[var(--bg)] rounded-full">
+                  <div className="p-4 bg-[var(--bg-soft)] rounded-full">
                       <AlertCircle size={32} className="text-amber-500" />
                   </div>
                   <div>
@@ -209,7 +209,7 @@ export default function TerminalPage() {
                   </div>
                   <Link
                       to="/settings"
-                      className="mt-2 px-6 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] hover:brightness-95 transition-colors flex items-center gap-2"
+                      className="mt-2 px-6 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg-soft)] text-[var(--text)] hover:brightness-95 transition-colors flex items-center gap-2"
                   >
                       <SettingsIcon size={16} />
                       {t('terminal.goToSettings')}
@@ -238,7 +238,7 @@ export default function TerminalPage() {
                                 value={masterPassword}
                                 onChange={(e) => setMasterPassword(e.target.value)}
                                 placeholder={t('terminal.masterPassphrasePlaceholder')}
-                                className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--text)] focus:outline-none focus:border-blue-500 transition-all pl-11"
+                                className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--text)] focus:outline-none focus:border-blue-500 transition-all pl-11"
                             />
                             <Unlock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
                         </div>
@@ -271,7 +271,7 @@ export default function TerminalPage() {
           <h2 className="text-3xl font-bold text-[var(--text)]">{t('terminal.title')}</h2>
           <p className="text-[var(--text-muted)] mt-1">{t('terminal.subtitle')}</p>
         </div>
-        <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] bg-[var(--bg)] px-3 py-1.5 rounded-full border border-[var(--border)]">
+        <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] bg-[var(--bg-soft)] px-3 py-1.5 rounded-full border border-[var(--border)]">
           <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
           {t('terminal.connectedViaWebsocket')}
         </div>

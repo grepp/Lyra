@@ -353,6 +353,22 @@ export default function Settings() {
     }
   };
 
+  const sectionClass = 'rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] overflow-hidden';
+  const sectionHeaderClass = 'p-6 border-b border-[var(--border)]';
+  const fieldBgClass = 'bg-[color-mix(in_oklab,var(--bg)_38%,var(--bg-elevated))]';
+  const inputClass = `w-full rounded-lg border border-[var(--border)] ${fieldBgClass} px-4 py-2.5 text-[var(--text)] transition-all focus:outline-none focus:border-blue-500`;
+  const selectClass = `${inputClass} appearance-none pr-10`;
+  const selectArrowStyle: React.CSSProperties = {
+    backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 12 12%27 fill=%27none%27%3E%3Cpath d=%27M2.5 4.5L6 8L9.5 4.5%27 stroke=%27%236b7280%27 stroke-width=%271.5%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E")',
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 0.85rem center',
+    backgroundSize: '12px',
+  };
+  const secondaryButtonClass = `rounded-lg border border-[var(--border)] ${fieldBgClass} px-4 py-2.5 text-sm font-medium text-[var(--text)] transition-all hover:brightness-95`;
+  const primaryButtonClass = 'rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition-all hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed';
+  const dangerButtonClass = 'rounded-lg bg-red-600/90 px-3 py-2 text-sm font-medium text-white transition-all hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed';
+  const resourceCardClass = `rounded-xl border border-[var(--border)] ${fieldBgClass} p-4 space-y-3`;
+
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">
       <div>
@@ -362,8 +378,8 @@ export default function Settings() {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
         {/* Branding Section */}
-        <section className="rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] overflow-hidden">
-          <div className="p-6 border-b border-[var(--border)]">
+        <section className={sectionClass}>
+          <div className={sectionHeaderClass}>
             <h3 className="text-xl font-semibold text-[var(--text)] flex items-center gap-2">{t('settings.generalTitle')}</h3>
             <p className="mt-1 text-sm text-[var(--text-muted)]">{t('settings.generalDescription')}</p>
           </div>
@@ -378,9 +394,9 @@ export default function Settings() {
                   value={localAppName}
                   onChange={(e) => setLocalAppName(e.target.value)}
                   disabled={isLoading}
-                  className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-4 py-2.5 text-[var(--text)] transition-all focus:outline-none focus:border-blue-500"
+                  className={`flex-1 ${inputClass}`}
                 />
-                <button type="submit" disabled={isLoading} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2"><Save size={18} />{t('actions.save')}</button>
+                <button type="submit" disabled={isLoading} className={`${primaryButtonClass} px-6 font-medium flex items-center gap-2`}><Save size={18} />{t('actions.save')}</button>
               </div>
             </div>
 
@@ -393,7 +409,8 @@ export default function Settings() {
                     aria-label={t('settings.language')}
                     value={i18n.language}
                     onChange={(e) => handleLanguageChange((e.target.value as 'en' | 'ko'))}
-                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-4 py-2.5 text-[var(--text)] transition-all focus:outline-none focus:border-blue-500"
+                    className={selectClass}
+                    style={selectArrowStyle}
                   >
                     <option value="en">{t('settings.languageEnglish')}</option>
                     <option value="ko">{t('settings.languageKorean')}</option>
@@ -406,9 +423,11 @@ export default function Settings() {
                     id="settings-theme"
                     aria-label={t('settings.theme')}
                     value={theme}
-                    onChange={(e) => setTheme(e.target.value as 'light' | 'dark')}
-                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg)] px-4 py-2.5 text-[var(--text)] transition-all focus:outline-none focus:border-blue-500"
+                    onChange={(e) => setTheme(e.target.value as 'light' | 'dark' | 'auto')}
+                    className={selectClass}
+                    style={selectArrowStyle}
                   >
+                    <option value="auto">{t('settings.themeAuto')}</option>
                     <option value="dark">{t('settings.themeDark')}</option>
                     <option value="light">{t('settings.themeLight')}</option>
                   </select>
@@ -419,7 +438,7 @@ export default function Settings() {
             <div className="space-y-3 pt-2">
               <label className="block text-sm font-medium text-[var(--text-muted)]">{t('settings.favicon')}</label>
               <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg)]">
+                <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-soft)]">
                   {localFaviconDataUrl ? (
                     <img src={localFaviconDataUrl} alt={t('settings.faviconPreviewAlt')} className="h-8 w-8 object-contain" />
                   ) : (
@@ -437,7 +456,7 @@ export default function Settings() {
                   <button
                     type="button"
                     onClick={() => faviconInputRef.current?.click()}
-                    className="rounded-lg border border-[var(--border)] bg-[var(--bg)] px-4 py-2 text-sm font-medium text-[var(--text)] transition-all hover:brightness-95"
+                    className={`${secondaryButtonClass} py-2`}
                   >
                     {t('actions.selectFile')}
                   </button>
@@ -445,7 +464,7 @@ export default function Settings() {
                     type="button"
                     onClick={handleSaveFavicon}
                     disabled={isLoading}
-                    className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`${primaryButtonClass} py-2 flex items-center gap-2`}
                   >
                     <Save size={14} />
                     {t('actions.save')}
@@ -454,7 +473,7 @@ export default function Settings() {
                     type="button"
                     onClick={handleResetFavicon}
                     disabled={isLoading}
-                    className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm font-medium text-[var(--text)] transition-all hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`${secondaryButtonClass} px-3 py-2 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     <Trash2 size={14} />
                     {t('actions.reset')}
@@ -488,8 +507,8 @@ export default function Settings() {
         </section>
 
         {/* SSH Connection Section */}
-        <section className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] overflow-hidden">
-          <div className="p-6 border-b border-[var(--border)]">
+        <section className={sectionClass}>
+          <div className={sectionHeaderClass}>
             <h3 className="text-xl font-semibold text-[var(--text)] flex items-center gap-2">
               <Server size={20} className="text-blue-400" /> {t('settings.hostServerTitle')}
             </h3>
@@ -500,22 +519,22 @@ export default function Settings() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="col-span-1 sm:col-span-2 space-y-2">
                 <label className="text-sm font-medium text-[var(--text-muted)]">{t('settings.hostAddress')}</label>
-                <div className="w-full bg-[var(--bg)]/50 border border-[var(--border)] rounded-lg px-4 py-2.5 text-[var(--text-muted)] text-sm flex items-center gap-2 overflow-hidden">
+                <div className={`w-full ${fieldBgClass} border border-[var(--border)] rounded-lg px-4 py-2.5 text-[var(--text-muted)] text-sm flex items-center gap-2 overflow-hidden`}>
                   <Server size={14} /> {window.location.hostname}
                   <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded ml-auto uppercase font-bold">{t('settings.autoDetected')}</span>
                 </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-[var(--text-muted)]">{t('settings.port')}</label>
-                <input type="number" value={sshSettings.port} onChange={e => setSshSettings({...sshSettings, port: e.target.value})} className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-[var(--text)] focus:outline-none focus:border-blue-500" />
+                <input type="number" value={sshSettings.port} onChange={e => setSshSettings({...sshSettings, port: e.target.value})} className={inputClass} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-[var(--text-muted)]">{t('settings.username')}</label>
-                <input type="text" value={sshSettings.username} onChange={e => setSshSettings({...sshSettings, username: e.target.value})} className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-[var(--text)] focus:outline-none focus:border-blue-500" />
+                <input type="text" value={sshSettings.username} onChange={e => setSshSettings({...sshSettings, username: e.target.value})} className={inputClass} />
               </div>
               <div className="col-span-1 sm:col-span-2 space-y-2">
                 <label className="text-sm font-medium text-[var(--text-muted)]">{t('settings.authenticationMethod')}</label>
-                <div className="flex gap-4 p-1 bg-[var(--bg)] rounded-lg border border-[var(--border)]">
+                <div className="flex gap-4 p-1 bg-[var(--bg-soft)] rounded-lg border border-[var(--border)]">
                   <button type="button" onClick={() => setSshSettings({...sshSettings, authMethod: 'password'})} className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${sshSettings.authMethod === 'password' ? 'bg-[var(--bg-elevated)] text-[var(--text)] border border-[var(--border)]' : 'text-[var(--text-muted)]'}`}>{t('settings.password')}</button>
                   <button type="button" onClick={() => setSshSettings({...sshSettings, authMethod: 'key'})} className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${sshSettings.authMethod === 'key' ? 'bg-[var(--bg-elevated)] text-[var(--text)] border border-[var(--border)]' : 'text-[var(--text-muted)]'}`}>{t('settings.sshKey')}</button>
                 </div>
@@ -525,25 +544,25 @@ export default function Settings() {
             {sshSettings.authMethod === 'password' ? (
               <div className="space-y-2">
                 <label className="text-sm font-medium text-[var(--text-muted)] flex items-center gap-2"><Lock size={14} /> {t('settings.password')}</label>
-                <input type="password" value={sshSettings.password} onChange={e => setSshSettings({...sshSettings, password: e.target.value})} className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-[var(--text)] focus:outline-none focus:border-blue-500" />
+                <input type="password" value={sshSettings.password} onChange={e => setSshSettings({...sshSettings, password: e.target.value})} className={inputClass} />
               </div>
             ) : (
               <div className="space-y-6">
                 <div className="space-y-2">
                     <label className="text-sm font-medium text-[var(--text-muted)] flex items-center gap-2"><Key size={14} /> {t('settings.privateKeyFile')}</label>
                     <div className="flex gap-4 items-center">
-                        <div className="flex-1 bg-[var(--bg)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-[var(--text)] font-mono text-sm overflow-hidden text-ellipsis whitespace-nowrap">
+                        <div className="flex-1 bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-[var(--text)] font-mono text-sm overflow-hidden text-ellipsis whitespace-nowrap">
                             {sshSettings.keyName || t('settings.noFileSelected')}
                         </div>
                         <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-                        <button type="button" onClick={() => fileInputRef.current?.click()} className="border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all hover:brightness-95">
+                        <button type="button" onClick={() => fileInputRef.current?.click()} className={`${secondaryButtonClass} flex items-center gap-2`}>
                             <FolderOpen size={18} /> {t('actions.selectFile')}
                         </button>
                     </div>
                 </div>
                 <div className="space-y-2">
                     <label className="text-sm font-medium text-[var(--text-muted)] flex items-center gap-2"><Lock size={14} /> {t('settings.masterPassphrase')}</label>
-                    <input type="password" placeholder={t('settings.masterPassphrasePlaceholder')} value={sshSettings.masterPassword} onChange={e => setSshSettings({...sshSettings, masterPassword: e.target.value})} className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-[var(--text)] focus:outline-none focus:border-blue-500" />
+                    <input type="password" placeholder={t('settings.masterPassphrasePlaceholder')} value={sshSettings.masterPassword} onChange={e => setSshSettings({...sshSettings, masterPassword: e.target.value})} className={inputClass} />
                     <p className="text-[10px] text-[var(--text-muted)] mt-1">{t('settings.masterPassphraseHelp')}</p>
                 </div>
               </div>
@@ -565,14 +584,14 @@ export default function Settings() {
                 <button
                   type="button"
                   onClick={handleTestSsh}
-                  className="w-full sm:w-auto border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] px-6 py-2.5 rounded-lg font-medium transition-all hover:brightness-95"
+                  className={`${secondaryButtonClass} w-full sm:w-auto px-6 font-medium`}
                 >
                   {t('actions.testConnection')}
                 </button>
                 <button
                   type="submit"
                   disabled={sshStatus.type === 'loading'}
-                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white px-10 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={`${primaryButtonClass} w-full sm:w-auto px-10 font-medium flex items-center justify-center gap-2`}
                 >
                   <Save size={18} />
                   {t('actions.save')}
@@ -583,7 +602,7 @@ export default function Settings() {
         </section>
       </div>
 
-      <section className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] overflow-hidden">
+      <section className={sectionClass}>
         <div className="p-6 border-b border-[var(--border)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h3 className="text-xl font-semibold text-[var(--text)] flex items-center gap-2">
@@ -594,7 +613,7 @@ export default function Settings() {
           <button
             type="button"
             onClick={() => loadResourceData(imageMode)}
-            className="self-start sm:self-auto border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all hover:brightness-95"
+            className={`${secondaryButtonClass} self-start sm:self-auto px-3 py-2 flex items-center gap-2`}
           >
             <RefreshCw size={14} className={isResourceLoading ? 'animate-spin' : ''} />
             {t('actions.refresh')}
@@ -602,13 +621,14 @@ export default function Settings() {
         </div>
 
         <div className="p-6 grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl p-4 space-y-3">
+          <div className={resourceCardClass}>
             <div className="flex items-center justify-between">
             <h4 className="text-[var(--text)] font-medium">{t('settings.unusedImages')}</h4>
               <select
                 value={imageMode}
                 onChange={(e) => setImageMode(e.target.value as 'dangling' | 'unused')}
-                className="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-[var(--text)]"
+                className={`w-auto min-w-[108px] appearance-none rounded-lg border border-[var(--border)] ${fieldBgClass} pl-2 pr-8 py-1 text-xs text-[var(--text)] transition-all focus:outline-none focus:border-blue-500`}
+                style={selectArrowStyle}
               >
                 <option value="dangling">{t('settings.danglingOnly')}</option>
                 <option value="unused">{t('settings.allUnused')}</option>
@@ -626,16 +646,12 @@ export default function Settings() {
                 </div>
               ))}
             </div>
-            <button
-              type="button"
-              onClick={runImagePrune}
-              className="bg-red-600/90 hover:bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all"
-            >
+            <button type="button" onClick={runImagePrune} className={dangerButtonClass}>
               {t('resource.cleanupImages')}
             </button>
           </div>
 
-          <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl p-4 space-y-3">
+          <div className={resourceCardClass}>
             <div className="flex items-center justify-between">
               <h4 className="text-[var(--text)] font-medium flex items-center gap-2"><HardDrive size={15} /> {t('settings.unusedVolumes')}</h4>
               <span className="text-xs text-[var(--text-muted)]">{t('settings.candidates', { count: unusedVolumes.length })}</span>
@@ -661,25 +677,16 @@ export default function Settings() {
                 </label>
               ))}
             </div>
-            <button
-              type="button"
-              onClick={runVolumePrune}
-              className="bg-red-600/90 hover:bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={selectedVolumes.length === 0}
-            >
+            <button type="button" onClick={runVolumePrune} className={dangerButtonClass} disabled={selectedVolumes.length === 0}>
               {t('resource.removeSelectedVolumes')}
             </button>
           </div>
 
-          <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl p-4 space-y-3">
+          <div className={resourceCardClass}>
             <h4 className="text-[var(--text)] font-medium">{t('settings.buildCache')}</h4>
             <div className="text-sm text-[var(--text)]">{t('settings.entries')}: <span className="font-mono">{buildCache.count}</span></div>
             <div className="text-sm text-[var(--text)]">{t('settings.size')}: <span className="font-mono">{formatBytes(buildCache.size)}</span></div>
-            <button
-              type="button"
-              onClick={runBuildCachePrune}
-              className="bg-red-600/90 hover:bg-red-500 text-white px-3 py-2 rounded-lg text-sm font-medium transition-all"
-            >
+            <button type="button" onClick={runBuildCachePrune} className={dangerButtonClass}>
               {t('resource.cleanupBuildCache')}
             </button>
           </div>

@@ -19,7 +19,7 @@ interface Template {
 export default function Templates() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
-  const { theme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -104,7 +104,7 @@ export default function Templates() {
                     {selectedTemplate.description && (
                          <div className="space-y-2">
                             <h4 className="text-sm font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('templates.description')}</h4>
-                            <p className="text-[var(--text)] bg-[var(--bg)] p-3 rounded-lg border border-[var(--border)]">
+                            <p className="text-[var(--text)] bg-[var(--bg-soft)] p-3 rounded-lg border border-[var(--border)]">
                                 {selectedTemplate.description}
                             </p>
                         </div>
@@ -119,7 +119,7 @@ export default function Templates() {
                                      <Editor
                                         height="100%"
                                         defaultLanguage="dockerfile"
-                                        theme={theme === 'dark' ? 'vs-dark' : 'vs'}
+                                        theme={resolvedTheme === 'dark' ? 'vs-dark' : 'vs'}
                                         value={selectedTemplate.config.dockerfile_content}
                                         options={{
                                             readOnly: true,
@@ -136,7 +136,7 @@ export default function Templates() {
                     </div>
                 </div>
 
-                <div className="p-4 border-t border-[var(--border)] flex justify-end gap-3 bg-[var(--bg)]">
+                <div className="p-4 border-t border-[var(--border)] flex justify-end gap-3 bg-[var(--bg-soft)]">
                     <button
                         onClick={() => setSelectedTemplate(null)}
                         className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text)] hover:brightness-95 transition-colors"
@@ -166,7 +166,7 @@ export default function Templates() {
           </div>
       ) : templates.length === 0 ? (
           <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] p-12 text-center text-[var(--text-muted)] flex flex-col items-center gap-4">
-            <div className="p-4 bg-[var(--bg)] rounded-full">
+            <div className="p-4 bg-[var(--bg-soft)] rounded-full">
                 <AlertCircle size={32} className="text-amber-500" />
             </div>
             <div>
@@ -175,7 +175,7 @@ export default function Templates() {
             </div>
             <button
                 onClick={() => navigate('/provisioning')}
-                className="mt-2 px-6 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] hover:brightness-95 transition-colors"
+                className="mt-2 px-6 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg-soft)] text-[var(--text)] hover:brightness-95 transition-colors"
             >
                 {t('templates.goToProvisioning')}
             </button>
@@ -190,7 +190,7 @@ export default function Templates() {
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-3">
                         <h3 className="text-lg font-bold text-[var(--text)] truncate">{template.name}</h3>
-                        <div className="flex items-center gap-1 text-xs text-[var(--text-muted)] bg-[var(--bg)] px-2 py-0.5 rounded border border-[var(--border)]">
+                        <div className="flex items-center gap-1 text-xs text-[var(--text-muted)] bg-[var(--bg-soft)] px-2 py-0.5 rounded border border-[var(--border)]">
                             <Clock size={10} />
                             {new Date(template.created_at).toLocaleDateString(i18n.language)}
                         </div>
@@ -204,7 +204,7 @@ export default function Templates() {
               <div className="flex items-center gap-3 ml-6 shrink-0">
                   <button
                       onClick={() => setSelectedTemplate(template)}
-                      className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] hover:brightness-95 flex items-center gap-2 transition-all"
+                      className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg-soft)] text-[var(--text)] hover:brightness-95 flex items-center gap-2 transition-all"
                   >
                       {t('templates.view')}
                   </button>

@@ -171,6 +171,7 @@ const enCommon = {
     languageEnglish: 'English',
     languageKorean: 'Korean',
     theme: 'Theme',
+    themeAuto: 'Auto (System)',
     themeDark: 'Black',
     themeLight: 'White',
     favicon: 'Favicon',
