@@ -25,7 +25,7 @@ class EnvironmentBase(BaseModel):
 
 
 class EnvironmentCreate(EnvironmentBase):
-    root_password: str = "admin"
+    root_password: str
 
 
 class EnvironmentResponse(EnvironmentBase):

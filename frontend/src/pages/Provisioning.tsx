@@ -23,7 +23,7 @@ export default function Provisioning() {
   const location = useLocation();
   const { showToast } = useToast();
   const [name, setName] = useState('');
-  const [password, setPassword] = useState('admin');
+  const [password, setPassword] = useState('');
 
   // Modal State
   const [modalConfig, setModalConfig] = useState({
@@ -302,7 +302,7 @@ export default function Provisioning() {
 
       <header className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold text-white tracking-tight">New Environment</h2>
+          <h2 className="text-3xl font-bold text-white tracking-tight">Provisioning</h2>
           <p className="text-gray-400 mt-1">Configure your GPU instance and build environment.</p>
         </div>
         <div className="flex gap-3">
@@ -553,6 +553,9 @@ export default function Provisioning() {
                         minimap: { enabled: false },
                         fontSize: 14,
                         scrollBeyondLastLine: false,
+                        scrollbar: {
+                            alwaysConsumeMouseWheel: false,
+                        },
                         padding: { top: 20, bottom: 20 },
                         fontFamily: "'JetBrains Mono', 'Fira Code', monospace"
                     }}

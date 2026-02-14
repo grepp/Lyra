@@ -4,10 +4,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { encrypt } from '../utils/crypto';
 
+type StatusState = { type: 'idle' | 'loading' | 'success' | 'error'; message?: string };
+
 export default function Settings() {
   const { appName, setAppName, isLoading: appLoading } = useApp();
   const [localAppName, setLocalAppName] = useState(appName);
-  const [status, setStatus] = useState<{ type: 'idle' | 'loading' | 'success' | 'error'; message?: string }>({ type: 'idle' });
+  const [appNameStatus, setAppNameStatus] = useState<StatusState>({ type: 'idle' });
+  const [sshStatus, setSshStatus] = useState<StatusState>({ type: 'idle' });
 
   // SSH Settings State
   const [sshSettings, setSshSettings] = useState({
@@ -65,18 +68,18 @@ export default function Settings() {
   const handleSaveName = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!localAppName.trim()) {
-      setStatus({ type: 'error', message: 'Application name cannot be empty.' });
+      setAppNameStatus({ type: 'error', message: 'Application name cannot be empty.' });
       return;
     }
 
     try {
-      setStatus({ type: 'loading' });
+      setAppNameStatus({ type: 'loading' });
       await setAppName(localAppName);
-      setStatus({ type: 'success', message: 'Application name updated successfully!' });
-      setTimeout(() => setStatus({ type: 'idle' }), 3000);
+      setAppNameStatus({ type: 'success', message: 'Application name updated successfully!' });
+      setTimeout(() => setAppNameStatus({ type: 'idle' }), 3000);
     } catch (error) {
       console.error(error);
-      setStatus({ type: 'error', message: 'Failed to update application name. Please try again.' });
+      setAppNameStatus({ type: 'error', message: 'Failed to update application name. Please try again.' });
     }
   };
 
@@ -100,7 +103,7 @@ export default function Settings() {
     e.preventDefault();
     try {
       if (!sshSettings.username.trim()) {
-        setStatus({ type: 'error', message: 'Username is required.' });
+        setSshStatus({ type: 'error', message: 'Username is required.' });
         return;
       }
 
@@ -113,7 +116,7 @@ export default function Settings() {
 
       if (sshSettings.authMethod === 'password') {
         if (!sshSettings.password.trim()) {
-          setStatus({ type: 'error', message: 'Password is required.' });
+          setSshStatus({ type: 'error', message: 'Password is required.' });
           return;
         }
         updates.push({ key: 'ssh_password', value: sshSettings.password });
@@ -123,14 +126,14 @@ export default function Settings() {
       if (sshSettings.authMethod === 'key') {
         if (sshSettings.privateKey) {
             if (!sshSettings.masterPassword) {
-                setStatus({ type: 'error', message: 'Master passphrase is required for encryption.' });
+                setSshStatus({ type: 'error', message: 'Master passphrase is required for encryption.' });
                 return;
             }
             const encrypted = await encrypt(sshSettings.privateKey, sshSettings.masterPassword);
             localStorage.setItem('ssh_private_key_encrypted', encrypted);
             localStorage.setItem('ssh_key_name', sshSettings.keyName);
         } else if (!sshSettings.keyName) {
-            setStatus({ type: 'error', message: 'Please select an SSH key file.' });
+            setSshStatus({ type: 'error', message: 'Please select an SSH key file.' });
             return;
         }
         // If they have keyName but no privateKey in state, it means they are using existing key
@@ -138,21 +141,21 @@ export default function Settings() {
 
       await Promise.all(updates.map(u => axios.put(`settings/${u.key}`, { value: u.value })));
 
-      setStatus({ type: 'success', message: 'SSH settings updated! Key is encrypted in your browser.' });
-      setTimeout(() => setStatus({ type: 'idle' }), 3000);
+      setSshStatus({ type: 'success', message: 'SSH settings updated! Key is encrypted in your browser.' });
+      setTimeout(() => setSshStatus({ type: 'idle' }), 3000);
     } catch (error) {
       console.error(error);
-      setStatus({ type: 'error', message: 'Failed to update SSH settings.' });
+      setSshStatus({ type: 'error', message: 'Failed to update SSH settings.' });
     }
   };
 
   const handleTestSsh = async () => {
     try {
-      setStatus({ type: 'loading', message: 'Testing connection...' });
+      setSshStatus({ type: 'loading', message: 'Testing connection...' });
 
       const keyToTest = sshSettings.privateKey;
       if (sshSettings.authMethod === 'key' && !keyToTest) {
-          setStatus({ type: 'error', message: 'Please pick a key file to test.' });
+          setSshStatus({ type: 'error', message: 'Please pick a key file to test.' });
           return;
       }
 
@@ -166,13 +169,13 @@ export default function Settings() {
       });
 
       if (res.data.status === 'success') {
-        setStatus({ type: 'success', message: 'Connection Successful!' });
+        setSshStatus({ type: 'success', message: 'Connection Successful!' });
       } else {
-        setStatus({ type: 'error', message: `Connection Failed: ${res.data.message}` });
+        setSshStatus({ type: 'error', message: `Connection Failed: ${res.data.message}` });
       }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      setStatus({ type: 'error', message: `Test failed: ${message}` });
+      setSshStatus({ type: 'error', message: `Test failed: ${message}` });
     }
   };
 
@@ -208,6 +211,16 @@ export default function Settings() {
                 <button type="submit" disabled={isLoading} className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-lg font-medium flex items-center gap-2"><Save size={18} />Save</button>
               </div>
             </div>
+            {appNameStatus.message && (
+              <div className={`flex items-center gap-2 text-sm p-3 rounded-lg border ${
+                appNameStatus.type === 'success'
+                  ? 'text-green-400 bg-green-500/5 border-green-500/20'
+                  : 'text-red-400 bg-red-500/5 border-red-500/20'
+              }`}>
+                {appNameStatus.type === 'success' ? <CheckCircle2 size={18} className="shrink-0" /> : <AlertCircle size={18} className="shrink-0" />}
+                <span className="font-medium">{appNameStatus.message}</span>
+              </div>
+            )}
           </form>
         </section>
 
@@ -274,14 +287,14 @@ export default function Settings() {
             )}
 
             <div className="pt-6 border-t border-[#3f3f46] flex flex-col gap-4">
-              {status.message && (
+              {sshStatus.message && (
                 <div className={`flex items-center gap-2 text-sm p-3 rounded-lg border ${
-                  status.type === 'success'
+                  sshStatus.type === 'success'
                     ? 'text-green-400 bg-green-500/5 border-green-500/20'
                     : 'text-red-400 bg-red-500/5 border-red-500/20'
                 }`}>
-                  {status.type === 'success' ? <CheckCircle2 size={18} className="shrink-0" /> : <AlertCircle size={18} className="shrink-0" />}
-                  <span className="font-medium">{status.message}</span>
+                  {sshStatus.type === 'success' ? <CheckCircle2 size={18} className="shrink-0" /> : <AlertCircle size={18} className="shrink-0" />}
+                  <span className="font-medium">{sshStatus.message}</span>
                 </div>
               )}
 
@@ -295,7 +308,7 @@ export default function Settings() {
                 </button>
                 <button
                   type="submit"
-                  disabled={status.type === 'loading'}
+                  disabled={sshStatus.type === 'loading'}
                   className="w-full sm:w-auto bg-blue-600 hover:bg-blue-500 text-white px-10 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Save size={18} />
