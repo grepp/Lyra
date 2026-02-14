@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
+import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
 
 interface MountPoint {
@@ -24,6 +25,7 @@ export default function Provisioning() {
   const location = useLocation();
   const { showToast } = useToast();
   const { t } = useTranslation();
+  const { theme } = useTheme();
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -561,7 +563,7 @@ export default function Provisioning() {
                 <Editor
                     height="100%"
                     defaultLanguage="dockerfile"
-                    theme="vs-dark"
+                    theme={theme === 'dark' ? 'vs-dark' : 'vs'}
                     value={dockerfile}
                     onChange={(value) => setDockerfile(value || '')}
                     options={{

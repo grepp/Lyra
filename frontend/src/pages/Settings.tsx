@@ -488,68 +488,68 @@ export default function Settings() {
         </section>
 
         {/* SSH Connection Section */}
-        <section className="bg-[#27272a] rounded-xl border border-[#3f3f46] overflow-hidden shadow-xl">
-          <div className="p-6 border-b border-[#3f3f46]">
-            <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+        <section className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] overflow-hidden shadow-xl">
+          <div className="p-6 border-b border-[var(--border)]">
+            <h3 className="text-xl font-semibold text-[var(--text)] flex items-center gap-2">
               <Server size={20} className="text-blue-400" /> {t('settings.hostServerTitle')}
             </h3>
-            <p className="text-sm text-gray-400 mt-1">{t('settings.hostServerDescription')}</p>
+            <p className="text-sm text-[var(--text-muted)] mt-1">{t('settings.hostServerDescription')}</p>
           </div>
 
           <form onSubmit={handleSaveSsh} className="p-6 space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="col-span-1 sm:col-span-2 space-y-2">
-                <label className="text-sm font-medium text-gray-300">{t('settings.hostAddress')}</label>
-                <div className="w-full bg-[#18181b]/50 border border-[#3f3f46] rounded-lg px-4 py-2.5 text-gray-400 text-sm flex items-center gap-2 overflow-hidden">
+                <label className="text-sm font-medium text-[var(--text-muted)]">{t('settings.hostAddress')}</label>
+                <div className="w-full bg-[var(--bg)]/50 border border-[var(--border)] rounded-lg px-4 py-2.5 text-[var(--text-muted)] text-sm flex items-center gap-2 overflow-hidden">
                   <Server size={14} /> {window.location.hostname}
                   <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded ml-auto uppercase font-bold">{t('settings.autoDetected')}</span>
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">{t('settings.port')}</label>
-                <input type="number" value={sshSettings.port} onChange={e => setSshSettings({...sshSettings, port: e.target.value})} className="w-full bg-[#18181b] border border-[#3f3f46] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500" />
+                <label className="text-sm font-medium text-[var(--text-muted)]">{t('settings.port')}</label>
+                <input type="number" value={sshSettings.port} onChange={e => setSshSettings({...sshSettings, port: e.target.value})} className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-[var(--text)] focus:outline-none focus:border-blue-500" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300">{t('settings.username')}</label>
-                <input type="text" value={sshSettings.username} onChange={e => setSshSettings({...sshSettings, username: e.target.value})} className="w-full bg-[#18181b] border border-[#3f3f46] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500" />
+                <label className="text-sm font-medium text-[var(--text-muted)]">{t('settings.username')}</label>
+                <input type="text" value={sshSettings.username} onChange={e => setSshSettings({...sshSettings, username: e.target.value})} className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-[var(--text)] focus:outline-none focus:border-blue-500" />
               </div>
               <div className="col-span-1 sm:col-span-2 space-y-2">
-                <label className="text-sm font-medium text-gray-300">{t('settings.authenticationMethod')}</label>
-                <div className="flex gap-4 p-1 bg-[#18181b] rounded-lg border border-[#3f3f46]">
-                  <button type="button" onClick={() => setSshSettings({...sshSettings, authMethod: 'password'})} className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${sshSettings.authMethod === 'password' ? 'bg-[#3f3f46] text-white' : 'text-gray-400'}`}>{t('settings.password')}</button>
-                  <button type="button" onClick={() => setSshSettings({...sshSettings, authMethod: 'key'})} className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${sshSettings.authMethod === 'key' ? 'bg-[#3f3f46] text-white' : 'text-gray-400'}`}>{t('settings.sshKey')}</button>
+                <label className="text-sm font-medium text-[var(--text-muted)]">{t('settings.authenticationMethod')}</label>
+                <div className="flex gap-4 p-1 bg-[var(--bg)] rounded-lg border border-[var(--border)]">
+                  <button type="button" onClick={() => setSshSettings({...sshSettings, authMethod: 'password'})} className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${sshSettings.authMethod === 'password' ? 'bg-[var(--bg-elevated)] text-[var(--text)] border border-[var(--border)]' : 'text-[var(--text-muted)]'}`}>{t('settings.password')}</button>
+                  <button type="button" onClick={() => setSshSettings({...sshSettings, authMethod: 'key'})} className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-all ${sshSettings.authMethod === 'key' ? 'bg-[var(--bg-elevated)] text-[var(--text)] border border-[var(--border)]' : 'text-[var(--text-muted)]'}`}>{t('settings.sshKey')}</button>
                 </div>
               </div>
             </div>
 
             {sshSettings.authMethod === 'password' ? (
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-300 flex items-center gap-2"><Lock size={14} /> {t('settings.password')}</label>
-                <input type="password" value={sshSettings.password} onChange={e => setSshSettings({...sshSettings, password: e.target.value})} className="w-full bg-[#18181b] border border-[#3f3f46] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500" />
+                <label className="text-sm font-medium text-[var(--text-muted)] flex items-center gap-2"><Lock size={14} /> {t('settings.password')}</label>
+                <input type="password" value={sshSettings.password} onChange={e => setSshSettings({...sshSettings, password: e.target.value})} className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-[var(--text)] focus:outline-none focus:border-blue-500" />
               </div>
             ) : (
               <div className="space-y-6">
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-300 flex items-center gap-2"><Key size={14} /> {t('settings.privateKeyFile')}</label>
+                    <label className="text-sm font-medium text-[var(--text-muted)] flex items-center gap-2"><Key size={14} /> {t('settings.privateKeyFile')}</label>
                     <div className="flex gap-4 items-center">
-                        <div className="flex-1 bg-[#18181b] border border-[#3f3f46] rounded-lg px-4 py-2.5 text-white font-mono text-sm overflow-hidden text-ellipsis whitespace-nowrap">
+                        <div className="flex-1 bg-[var(--bg)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-[var(--text)] font-mono text-sm overflow-hidden text-ellipsis whitespace-nowrap">
                             {sshSettings.keyName || t('settings.noFileSelected')}
                         </div>
                         <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-                        <button type="button" onClick={() => fileInputRef.current?.click()} className="bg-[#3f3f46] hover:bg-[#52525b] text-white px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all">
+                        <button type="button" onClick={() => fileInputRef.current?.click()} className="border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] px-4 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all hover:brightness-95">
                             <FolderOpen size={18} /> {t('actions.selectFile')}
                         </button>
                     </div>
                 </div>
                 <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-300 flex items-center gap-2"><Lock size={14} /> {t('settings.masterPassphrase')}</label>
-                    <input type="password" placeholder={t('settings.masterPassphrasePlaceholder')} value={sshSettings.masterPassword} onChange={e => setSshSettings({...sshSettings, masterPassword: e.target.value})} className="w-full bg-[#18181b] border border-[#3f3f46] rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-blue-500" />
-                    <p className="text-[10px] text-gray-500 mt-1">{t('settings.masterPassphraseHelp')}</p>
+                    <label className="text-sm font-medium text-[var(--text-muted)] flex items-center gap-2"><Lock size={14} /> {t('settings.masterPassphrase')}</label>
+                    <input type="password" placeholder={t('settings.masterPassphrasePlaceholder')} value={sshSettings.masterPassword} onChange={e => setSshSettings({...sshSettings, masterPassword: e.target.value})} className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-[var(--text)] focus:outline-none focus:border-blue-500" />
+                    <p className="text-[10px] text-[var(--text-muted)] mt-1">{t('settings.masterPassphraseHelp')}</p>
                 </div>
               </div>
             )}
 
-            <div className="pt-6 border-t border-[#3f3f46] flex flex-col gap-4">
+            <div className="pt-6 border-t border-[var(--border)] flex flex-col gap-4">
               {sshStatus.message && (
                 <div className={`flex items-center gap-2 text-sm p-3 rounded-lg border ${
                   sshStatus.type === 'success'
@@ -565,7 +565,7 @@ export default function Settings() {
                 <button
                   type="button"
                   onClick={handleTestSsh}
-                  className="w-full sm:w-auto bg-[#3f3f46] hover:bg-[#52525b] text-white px-6 py-2.5 rounded-lg font-medium transition-all"
+                  className="w-full sm:w-auto border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] px-6 py-2.5 rounded-lg font-medium transition-all hover:brightness-95"
                 >
                   {t('actions.testConnection')}
                 </button>
@@ -583,18 +583,18 @@ export default function Settings() {
         </section>
       </div>
 
-      <section className="bg-[#27272a] rounded-xl border border-[#3f3f46] overflow-hidden shadow-xl">
-        <div className="p-6 border-b border-[#3f3f46] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      <section className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] overflow-hidden shadow-xl">
+        <div className="p-6 border-b border-[var(--border)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h3 className="text-xl font-semibold text-white flex items-center gap-2">
+            <h3 className="text-xl font-semibold text-[var(--text)] flex items-center gap-2">
               {t('settings.resourceManagementTitle')}
             </h3>
-            <p className="text-sm text-gray-400 mt-1">{t('settings.resourceManagementDescription')}</p>
+            <p className="text-sm text-[var(--text-muted)] mt-1">{t('settings.resourceManagementDescription')}</p>
           </div>
           <button
             type="button"
             onClick={() => loadResourceData(imageMode)}
-            className="self-start sm:self-auto bg-[#3f3f46] hover:bg-[#52525b] text-white px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all"
+            className="self-start sm:self-auto border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-all hover:brightness-95"
           >
             <RefreshCw size={14} className={isResourceLoading ? 'animate-spin' : ''} />
             {t('actions.refresh')}
@@ -602,27 +602,27 @@ export default function Settings() {
         </div>
 
         <div className="p-6 grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <div className="bg-[#18181b] border border-[#3f3f46] rounded-xl p-4 space-y-3">
+          <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
-            <h4 className="text-white font-medium">{t('settings.unusedImages')}</h4>
+            <h4 className="text-[var(--text)] font-medium">{t('settings.unusedImages')}</h4>
               <select
                 value={imageMode}
                 onChange={(e) => setImageMode(e.target.value as 'dangling' | 'unused')}
-                className="bg-[#27272a] border border-[#3f3f46] rounded-lg px-2 py-1 text-xs text-gray-200"
+                className="bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-2 py-1 text-xs text-[var(--text)]"
               >
                 <option value="dangling">{t('settings.danglingOnly')}</option>
                 <option value="unused">{t('settings.allUnused')}</option>
               </select>
             </div>
-            <p className="text-xs text-gray-400">{t('settings.candidateImages', { count: unusedImages.length })}</p>
+            <p className="text-xs text-[var(--text-muted)]">{t('settings.candidateImages', { count: unusedImages.length })}</p>
             <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
               {unusedImages.length === 0 ? (
-                <p className="text-xs text-gray-500">{t('settings.noRemovableImages')}</p>
+                <p className="text-xs text-[var(--text-muted)]">{t('settings.noRemovableImages')}</p>
               ) : unusedImages.map((img) => (
-                <div key={img.id} className="text-xs border border-[#3f3f46] rounded-lg p-2 text-gray-300">
-                  <div className="font-mono text-[11px] text-gray-200">{img.short_id}</div>
+                <div key={img.id} className="text-xs border border-[var(--border)] rounded-lg p-2 text-[var(--text)]">
+                  <div className="font-mono text-[11px] text-[var(--text)]">{img.short_id}</div>
                   <div className="truncate">{(img.tags && img.tags.length > 0 ? img.tags.join(', ') : '<none>:<none>')}</div>
-                  <div className="text-gray-500">{formatBytes(img.size)}</div>
+                  <div className="text-[var(--text-muted)]">{formatBytes(img.size)}</div>
                 </div>
               ))}
             </div>
@@ -635,16 +635,16 @@ export default function Settings() {
             </button>
           </div>
 
-          <div className="bg-[#18181b] border border-[#3f3f46] rounded-xl p-4 space-y-3">
+          <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-white font-medium flex items-center gap-2"><HardDrive size={15} /> {t('settings.unusedVolumes')}</h4>
-              <span className="text-xs text-gray-400">{t('settings.candidates', { count: unusedVolumes.length })}</span>
+              <h4 className="text-[var(--text)] font-medium flex items-center gap-2"><HardDrive size={15} /> {t('settings.unusedVolumes')}</h4>
+              <span className="text-xs text-[var(--text-muted)]">{t('settings.candidates', { count: unusedVolumes.length })}</span>
             </div>
             <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
               {unusedVolumes.length === 0 ? (
-                <p className="text-xs text-gray-500">{t('settings.noRemovableVolumes')}</p>
+                <p className="text-xs text-[var(--text-muted)]">{t('settings.noRemovableVolumes')}</p>
               ) : unusedVolumes.map((vol) => (
-                <label key={vol.name} className="flex items-start gap-2 text-xs border border-[#3f3f46] rounded-lg p-2 text-gray-300 cursor-pointer">
+                <label key={vol.name} className="flex items-start gap-2 text-xs border border-[var(--border)] rounded-lg p-2 text-[var(--text)] cursor-pointer">
                   <input
                     type="checkbox"
                     checked={selectedVolumes.includes(vol.name)}
@@ -655,8 +655,8 @@ export default function Settings() {
                     className="mt-0.5"
                   />
                   <div className="min-w-0">
-                    <div className="font-mono text-[11px] text-gray-200 break-all">{vol.name}</div>
-                    <div className="text-gray-500 break-all">{vol.mountpoint}</div>
+                    <div className="font-mono text-[11px] text-[var(--text)] break-all">{vol.name}</div>
+                    <div className="text-[var(--text-muted)] break-all">{vol.mountpoint}</div>
                   </div>
                 </label>
               ))}
@@ -671,10 +671,10 @@ export default function Settings() {
             </button>
           </div>
 
-          <div className="bg-[#18181b] border border-[#3f3f46] rounded-xl p-4 space-y-3">
-            <h4 className="text-white font-medium">{t('settings.buildCache')}</h4>
-            <div className="text-sm text-gray-300">{t('settings.entries')}: <span className="font-mono">{buildCache.count}</span></div>
-            <div className="text-sm text-gray-300">{t('settings.size')}: <span className="font-mono">{formatBytes(buildCache.size)}</span></div>
+          <div className="bg-[var(--bg)] border border-[var(--border)] rounded-xl p-4 space-y-3">
+            <h4 className="text-[var(--text)] font-medium">{t('settings.buildCache')}</h4>
+            <div className="text-sm text-[var(--text)]">{t('settings.entries')}: <span className="font-mono">{buildCache.count}</span></div>
+            <div className="text-sm text-[var(--text)]">{t('settings.size')}: <span className="font-mono">{formatBytes(buildCache.size)}</span></div>
             <button
               type="button"
               onClick={runBuildCachePrune}

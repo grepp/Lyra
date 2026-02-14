@@ -4,6 +4,7 @@ import { AlertCircle, Clock, Play, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../context/ThemeContext';
 import Modal from '../components/Modal';
 
 interface Template {
@@ -18,6 +19,7 @@ interface Template {
 export default function Templates() {
   const navigate = useNavigate();
   const { t, i18n } = useTranslation();
+  const { theme } = useTheme();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -86,12 +88,12 @@ export default function Templates() {
 
       {/* Template Details Modal */}
       {selectedTemplate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-[#18181b] rounded-xl border border-[#3f3f46] shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-                <div className="p-6 border-b border-[#27272a] flex justify-between items-start">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] backdrop-blur-sm">
+            <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
+                <div className="p-6 border-b border-[var(--border)] flex justify-between items-start">
                     <div>
-                        <h3 className="text-xl font-bold text-white">{selectedTemplate.name}</h3>
-                        <div className="flex items-center gap-2 mt-2 text-sm text-gray-400">
+                        <h3 className="text-xl font-bold text-[var(--text)]">{selectedTemplate.name}</h3>
+                        <div className="flex items-center gap-2 mt-2 text-sm text-[var(--text-muted)]">
                              <Clock size={14} />
                              <span>{t('templates.createdAt', { value: new Date(selectedTemplate.created_at).toLocaleString(i18n.language) })}</span>
                         </div>
@@ -101,8 +103,8 @@ export default function Templates() {
                 <div className="p-6 overflow-y-auto space-y-6">
                     {selectedTemplate.description && (
                          <div className="space-y-2">
-                            <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider">{t('templates.description')}</h4>
-                            <p className="text-gray-300 bg-[#27272a]/50 p-3 rounded-lg border border-[#3f3f46]">
+                            <h4 className="text-sm font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('templates.description')}</h4>
+                            <p className="text-[var(--text)] bg-[var(--bg)] p-3 rounded-lg border border-[var(--border)]">
                                 {selectedTemplate.description}
                             </p>
                         </div>
@@ -112,12 +114,12 @@ export default function Templates() {
 
                         {selectedTemplate.config.dockerfile_content && (
                             <div className="space-y-2">
-                                <h4 className="text-sm font-medium text-gray-400 uppercase tracking-wider">{t('templates.dockerfile')}</h4>
-                                <div className="h-64 rounded-lg border border-[#3f3f46] overflow-hidden">
+                                <h4 className="text-sm font-medium text-[var(--text-muted)] uppercase tracking-wider">{t('templates.dockerfile')}</h4>
+                                <div className="h-64 rounded-lg border border-[var(--border)] overflow-hidden">
                                      <Editor
                                         height="100%"
                                         defaultLanguage="dockerfile"
-                                        theme="vs-dark"
+                                        theme={theme === 'dark' ? 'vs-dark' : 'vs'}
                                         value={selectedTemplate.config.dockerfile_content}
                                         options={{
                                             readOnly: true,
@@ -134,10 +136,10 @@ export default function Templates() {
                     </div>
                 </div>
 
-                <div className="p-4 border-t border-[#3f3f46] flex justify-end gap-3 bg-[#27272a]/50">
+                <div className="p-4 border-t border-[var(--border)] flex justify-end gap-3 bg-[var(--bg)]">
                     <button
                         onClick={() => setSelectedTemplate(null)}
-                        className="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-[#3f3f46] transition-colors"
+                        className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text)] hover:brightness-95 transition-colors"
                     >
                         {t('actions.close')}
                     </button>
@@ -153,27 +155,27 @@ export default function Templates() {
       )}
 
       <header>
-        <h2 className="text-3xl font-bold text-white tracking-tight">{t('templates.title')}</h2>
-        <p className="text-gray-400 mt-1">{t('templates.subtitle')}</p>
+        <h2 className="text-3xl font-bold text-[var(--text)] tracking-tight">{t('templates.title')}</h2>
+        <p className="text-[var(--text-muted)] mt-1">{t('templates.subtitle')}</p>
       </header>
 
       {isLoading ? (
           <div className="text-center py-20">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
-              <p className="text-gray-400">{t('templates.loadingTemplates')}</p>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--text)] mx-auto mb-4"></div>
+              <p className="text-[var(--text-muted)]">{t('templates.loadingTemplates')}</p>
           </div>
       ) : templates.length === 0 ? (
-          <div className="bg-[#18181b] rounded-xl border border-[#27272a] p-12 text-center text-gray-400 flex flex-col items-center gap-4">
-            <div className="p-4 bg-[#27272a] rounded-full">
+          <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] p-12 text-center text-[var(--text-muted)] flex flex-col items-center gap-4">
+            <div className="p-4 bg-[var(--bg)] rounded-full">
                 <AlertCircle size={32} className="text-amber-500" />
             </div>
             <div>
-                <h3 className="text-lg font-semibold text-white mb-1">{t('templates.noTemplatesTitle')}</h3>
+                <h3 className="text-lg font-semibold text-[var(--text)] mb-1">{t('templates.noTemplatesTitle')}</h3>
                 <p>{t('templates.noTemplatesMessage')}</p>
             </div>
             <button
                 onClick={() => navigate('/provisioning')}
-                className="mt-2 px-6 py-2 bg-[#27272a] hover:bg-[#3f3f46] text-white rounded-lg text-sm font-medium transition-colors"
+                className="mt-2 px-6 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] hover:brightness-95 transition-colors"
             >
                 {t('templates.goToProvisioning')}
             </button>
@@ -181,19 +183,19 @@ export default function Templates() {
       ) : (
         <div className="space-y-4">
           {templates.map((template) => (
-            <div key={template.id} className="bg-[#18181b] rounded-xl border border-[#27272a] p-4 flex items-center justify-between group hover:border-[#3f3f46] transition-all hover:bg-[#202023]">
+            <div key={template.id} className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] p-4 flex items-center justify-between group transition-all hover:brightness-95">
 
               <div className="flex items-center gap-4 flex-1 min-w-0 pointer-events-none">
 
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-3">
-                        <h3 className="text-lg font-bold text-white truncate">{template.name}</h3>
-                        <div className="flex items-center gap-1 text-xs text-gray-500 bg-[#27272a] px-2 py-0.5 rounded border border-[#3f3f46]">
+                        <h3 className="text-lg font-bold text-[var(--text)] truncate">{template.name}</h3>
+                        <div className="flex items-center gap-1 text-xs text-[var(--text-muted)] bg-[var(--bg)] px-2 py-0.5 rounded border border-[var(--border)]">
                             <Clock size={10} />
                             {new Date(template.created_at).toLocaleDateString(i18n.language)}
                         </div>
                     </div>
-                    <p className="text-sm text-gray-400 truncate mt-0.5">
+                    <p className="text-sm text-[var(--text-muted)] truncate mt-0.5">
                         {template.description}
                     </p>
                 </div>
@@ -202,13 +204,13 @@ export default function Templates() {
               <div className="flex items-center gap-3 ml-6 shrink-0">
                   <button
                       onClick={() => setSelectedTemplate(template)}
-                      className="px-4 py-2 bg-[#27272a] hover:bg-[#3f3f46] border border-[#3f3f46] hover:border-gray-500/50 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-all"
+                      className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] hover:brightness-95 flex items-center gap-2 transition-all"
                   >
                       {t('templates.view')}
                   </button>
                   <button
                       onClick={() => handleDeleteClick(template.id, template.name)}
-                      className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                      className="p-2 text-[var(--text-muted)] hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                       title={t('templates.deleteTemplate')}
                   >
                       <Trash2 size={18} />

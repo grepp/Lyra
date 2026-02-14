@@ -18,6 +18,8 @@
     --primary-contrast: #ffffff;
     --danger: #dc2626;
     --success: #16a34a;
+    --terminal-bg: #000000;
+    --terminal-border: #3f3f46;
   }
 
   html.theme-dark {
@@ -32,6 +34,8 @@
     --primary-contrast: #ffffff;
     --danger: #ef4444;
     --success: #22c55e;
+    --terminal-bg: #000000;
+    --terminal-border: #3f3f46;
   }
 
   html, body {

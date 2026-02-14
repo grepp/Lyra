@@ -8,6 +8,13 @@ import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 import { decrypt } from '../utils/crypto';
 
+const XTERM_DARK_THEME = {
+  background: '#000000',
+  foreground: '#ffffff',
+  cursor: '#4ade80',
+  selectionBackground: 'rgba(74, 222, 128, 0.28)',
+};
+
 export default function TerminalPage() {
   const { t } = useTranslation();
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -76,11 +83,7 @@ export default function TerminalPage() {
       cursorBlink: true,
       fontFamily: '"JetBrains Mono", "Fira Code", monospace',
       fontSize: 14,
-      theme: {
-        background: '#000000',
-        foreground: '#ffffff',
-        cursor: '#4ade80',
-      },
+      theme: XTERM_DARK_THEME,
     });
 
     const fitAddon = new FitAddon();
@@ -182,7 +185,7 @@ export default function TerminalPage() {
 
   if (isConfigured === null) {
       return (
-          <div className="h-full flex items-center justify-center bg-[#18181b]">
+          <div className="h-full flex items-center justify-center bg-[var(--surface)]">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
           </div>
       );
@@ -192,21 +195,21 @@ export default function TerminalPage() {
       return (
           <div className="p-8 max-w-7xl mx-auto space-y-8 relative">
               <header>
-                  <h2 className="text-3xl font-bold text-white tracking-tight">{t('terminal.title')}</h2>
-                  <p className="text-gray-400 mt-1">{t('terminal.subtitle')}</p>
+                  <h2 className="text-3xl font-bold text-[var(--text)] tracking-tight">{t('terminal.title')}</h2>
+                  <p className="text-[var(--text-muted)] mt-1">{t('terminal.subtitle')}</p>
               </header>
 
-              <div className="bg-[#18181b] rounded-xl border border-[#27272a] p-12 text-center text-gray-400 flex flex-col items-center gap-4">
-                  <div className="p-4 bg-[#27272a] rounded-full">
+              <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] p-12 text-center text-[var(--text-muted)] flex flex-col items-center gap-4">
+                  <div className="p-4 bg-[var(--bg)] rounded-full">
                       <AlertCircle size={32} className="text-amber-500" />
                   </div>
                   <div>
-                      <h3 className="text-lg font-semibold text-white mb-1">{t('terminal.setupRequiredTitle')}</h3>
+                      <h3 className="text-lg font-semibold text-[var(--text)] mb-1">{t('terminal.setupRequiredTitle')}</h3>
                       <p>{t('terminal.setupRequiredMessage')}</p>
                   </div>
                   <Link
                       to="/settings"
-                      className="mt-2 px-6 py-2 bg-[#27272a] hover:bg-[#3f3f46] text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                      className="mt-2 px-6 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg)] text-[var(--text)] hover:brightness-95 transition-colors flex items-center gap-2"
                   >
                       <SettingsIcon size={16} />
                       {t('terminal.goToSettings')}
@@ -218,14 +221,14 @@ export default function TerminalPage() {
 
   if (!isUnlocked) {
     return (
-        <div className="h-full flex items-center justify-center bg-[#18181b] p-6">
-            <div className="max-w-md w-full bg-[#27272a] rounded-2xl border border-[#3f3f46] p-8 shadow-2xl">
+        <div className="h-full flex items-center justify-center bg-[var(--surface)] p-6">
+            <div className="max-w-md w-full bg-[var(--bg-elevated)] rounded-2xl border border-[var(--border)] p-8 shadow-2xl">
                 <div className="flex flex-col items-center text-center space-y-4">
                     <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-400 mb-2">
                         <Lock size={32} />
                     </div>
-                    <h2 className="text-2xl font-bold text-white">{t('terminal.lockedTitle')}</h2>
-                    <p className="text-gray-400">{t('terminal.lockedMessage')}</p>
+                    <h2 className="text-2xl font-bold text-[var(--text)]">{t('terminal.lockedTitle')}</h2>
+                    <p className="text-[var(--text-muted)]">{t('terminal.lockedMessage')}</p>
 
                     <form onSubmit={handleUnlock} className="w-full space-y-4 mt-6">
                         <div className="relative">
@@ -235,9 +238,9 @@ export default function TerminalPage() {
                                 value={masterPassword}
                                 onChange={(e) => setMasterPassword(e.target.value)}
                                 placeholder={t('terminal.masterPassphrasePlaceholder')}
-                                className="w-full bg-[#18181b] border border-[#3f3f46] rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-all pl-11"
+                                className="w-full bg-[var(--bg)] border border-[var(--border)] rounded-xl px-4 py-3 text-[var(--text)] focus:outline-none focus:border-blue-500 transition-all pl-11"
                             />
-                            <Unlock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" />
+                            <Unlock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
                         </div>
 
                         {error && (
@@ -262,18 +265,18 @@ export default function TerminalPage() {
   }
 
   return (
-    <div className="p-8 h-full flex flex-col space-y-8 bg-[#18181b]">
+    <div className="p-8 h-full flex flex-col space-y-8 bg-[var(--surface)]">
       <header className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold text-white">{t('terminal.title')}</h2>
-          <p className="text-gray-400 mt-1">{t('terminal.subtitle')}</p>
+          <h2 className="text-3xl font-bold text-[var(--text)]">{t('terminal.title')}</h2>
+          <p className="text-[var(--text-muted)] mt-1">{t('terminal.subtitle')}</p>
         </div>
-        <div className="flex items-center gap-2 text-xs text-gray-400 bg-[#27272a] px-3 py-1.5 rounded-full border border-[#3f3f46]">
+        <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] bg-[var(--bg)] px-3 py-1.5 rounded-full border border-[var(--border)]">
           <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"></span>
           {t('terminal.connectedViaWebsocket')}
         </div>
       </header>
-       <div className="flex-1 bg-black rounded-xl border border-[#3f3f46] p-2 overflow-hidden shadow-2xl ring-1 ring-white/5">
+       <div className="flex-1 rounded-xl border border-[var(--terminal-border)] p-2 overflow-hidden shadow-2xl bg-[var(--terminal-bg)]">
          <div ref={terminalRef} className="w-full h-full" />
        </div>
     </div>
