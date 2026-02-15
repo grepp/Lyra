@@ -71,7 +71,10 @@ export default function Provisioning() {
              const config = state.templateConfig;
 
              // Only load Dockerfile content
-             if (config.dockerfile_content) setDockerfile(config.dockerfile_content);
+             if (config.dockerfile_content) {
+               setDockerfile(config.dockerfile_content);
+               setErrors((prev) => ({ ...prev, dockerfile: undefined }));
+             }
 
              // Clear state so refresh doesn't reload template
              window.history.replaceState({}, document.title);
@@ -128,16 +131,17 @@ export default function Provisioning() {
   };
 
   // Error State
-  const [errors, setErrors] = useState<{name?: string, password?: string}>({});
+  const [errors, setErrors] = useState<{name?: string, password?: string, dockerfile?: string}>({});
 
   const handleSubmit = async () => {
-    const newErrors: {name?: string, password?: string} = {};
+    const newErrors: {name?: string, password?: string, dockerfile?: string} = {};
     if (!name.trim()) {
         newErrors.name = t('provisioning.errorEnvironmentNameRequired');
     } else if (!/^[a-zA-Z0-9-]+$/.test(name)) {
         newErrors.name = t('provisioning.errorEnvironmentNameFormat');
     }
     if (!password.trim()) newErrors.password = t('provisioning.errorRootPasswordRequired');
+    if (!dockerfile.trim()) newErrors.dockerfile = t('provisioning.errorDockerfileRequired');
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -534,7 +538,12 @@ export default function Provisioning() {
         </div>
 
         {/* Right Column: Dockerfile Editor */}
-        <div className="lg:col-span-2 flex flex-col h-[800px] bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] overflow-hidden">
+        <div
+          className={clsx(
+            "lg:col-span-2 flex flex-col h-[800px] bg-[var(--bg-elevated)] rounded-xl border overflow-hidden",
+            errors.dockerfile ? "border-red-500/50" : "border-[var(--border)]"
+          )}
+        >
              <div className="px-6 py-4 border-b border-[var(--border)] flex justify-between items-center bg-[var(--bg-soft)]">
                 <div className="flex items-center gap-3">
                     <div className="p-1.5 bg-blue-500/10 rounded-md">
@@ -559,13 +568,23 @@ export default function Provisioning() {
                     </button>
                 </div>
              </div>
+             {errors.dockerfile && (
+               <div className="border-b border-red-500/20 bg-red-500/5 px-6 py-2">
+                 <p className="text-xs text-red-400">{errors.dockerfile}</p>
+               </div>
+             )}
              <div className="flex-1 relative">
                 <Editor
                     height="100%"
                     defaultLanguage="dockerfile"
                     theme={resolvedTheme === 'dark' ? 'vs-dark' : 'vs'}
                     value={dockerfile}
-                    onChange={(value) => setDockerfile(value || '')}
+                    onChange={(value) => {
+                      setDockerfile(value || '');
+                      if (errors.dockerfile && (value || '').trim()) {
+                        setErrors((prev) => ({ ...prev, dockerfile: undefined }));
+                      }
+                    }}
                     options={{
                         minimap: { enabled: false },
                         fontSize: 14,
@@ -617,6 +636,7 @@ export default function Provisioning() {
                                     onClick={() => {
                                         if (template.config.dockerfile_content) {
                                             setDockerfile(template.config.dockerfile_content);
+                                            setErrors((prev) => ({ ...prev, dockerfile: undefined }));
                                             setIsLoadModalOpen(false);
                                             showToast(t('feedback.provisioning.templateLoaded'), "success");
                                         } else {

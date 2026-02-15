@@ -232,6 +232,9 @@ async def create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(
 
     import pynvml
 
+    if not env.dockerfile_content or not env.dockerfile_content.strip():
+        raise HTTPException(status_code=400, detail="Dockerfile content is required")
+
     # Real GPU Allocation Logic
     gpu_indices = []
     if env.gpu_count > 0:

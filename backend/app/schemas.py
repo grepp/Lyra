@@ -26,6 +26,7 @@ class EnvironmentBase(BaseModel):
 
 class EnvironmentCreate(EnvironmentBase):
     root_password: str
+    dockerfile_content: str
 
 
 class EnvironmentResponse(EnvironmentBase):

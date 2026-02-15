@@ -128,6 +128,7 @@ const koCommon = {
     errorEnvironmentNameRequired: '환경 이름은 필수입니다.',
     errorEnvironmentNameFormat: '영문, 숫자, 하이픈(-)만 사용할 수 있습니다.',
     errorRootPasswordRequired: '루트 비밀번호는 필수입니다.',
+    errorDockerfileRequired: 'Dockerfile은 필수입니다.',
     errorTemplateNameRequired: '템플릿 이름은 필수입니다.',
   },
   templates: {
