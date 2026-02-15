@@ -2,7 +2,7 @@ import Editor from '@monaco-editor/react';
 import axios from 'axios';
 import clsx from 'clsx';
 import { Eye, EyeOff, FolderOpen, Play, Plus, Save, Trash2, Upload } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
@@ -130,7 +130,6 @@ export default function Provisioning() {
   const [userDockerfile, setUserDockerfile] = useState('FROM python:3.11-slim\n');
   const [enableJupyter, setEnableJupyter] = useState(true);
   const [enableCodeServer, setEnableCodeServer] = useState(true);
-  const isManagedEditToastShown = useRef(false);
 
   // Fetch GPU Resources and Load Template
   useEffect(() => {
@@ -210,6 +209,10 @@ export default function Provisioning() {
     () => composeDockerfile(userDockerfile, enableJupyter, enableCodeServer),
     [userDockerfile, enableJupyter, enableCodeServer]
   );
+  const managedBlocksText = useMemo(
+    () => normalizeDockerfile(buildManagedBlocks(enableJupyter, enableCodeServer)),
+    [enableJupyter, enableCodeServer]
+  );
 
   // Error State
   const [errors, setErrors] = useState<{name?: string, password?: string, dockerfile?: string}>({});
@@ -222,7 +225,7 @@ export default function Provisioning() {
         newErrors.name = t('provisioning.errorEnvironmentNameFormat');
     }
     if (!password.trim()) newErrors.password = t('provisioning.errorRootPasswordRequired');
-    if (!stripManagedBlocks(userDockerfile).trim()) newErrors.dockerfile = t('provisioning.errorDockerfileRequired');
+    if (!userDockerfile.trim()) newErrors.dockerfile = t('provisioning.errorDockerfileRequired');
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -271,9 +274,7 @@ export default function Provisioning() {
       setTemplateErrors({});
 
       try {
-          const templateDockerfile = normalizeDockerfile(
-            stripManagedBlocks(renderedDockerfile)
-          );
+          const templateDockerfile = normalizeDockerfile(userDockerfile);
 
           // Only save Dockerfile content as requested
           const config = {
@@ -687,30 +688,21 @@ export default function Provisioning() {
                  <p className="text-xs text-red-400">{errors.dockerfile}</p>
                </div>
              )}
-             <div className="flex-1 relative">
+             <div className="flex-1 min-h-0 relative">
                 <Editor
                     height="100%"
                     defaultLanguage="dockerfile"
                     theme={resolvedTheme === 'dark' ? 'vs-dark' : 'vs'}
-                    value={renderedDockerfile}
+                    value={userDockerfile}
                     onChange={(value) => {
-                      const nextValue = value || '';
-                      const currentNormalized = stripManagedBlocks(renderedDockerfile);
-                      const normalized = stripManagedBlocks(nextValue);
-                      const isManagedOnlyEdit = nextValue !== renderedDockerfile && normalized === currentNormalized;
-                      if (isManagedOnlyEdit && !isManagedEditToastShown.current) {
-                        showToast(t('provisioning.managedBlockLockedNotice'), 'info');
-                        isManagedEditToastShown.current = true;
-                        window.setTimeout(() => {
-                          isManagedEditToastShown.current = false;
-                        }, 1500);
-                      }
+                      const normalized = normalizeDockerfile(value || '');
                       setUserDockerfile(normalized);
                       if (errors.dockerfile && normalized.trim()) {
                         setErrors((prev) => ({ ...prev, dockerfile: undefined }));
                       }
                     }}
                     options={{
+                        automaticLayout: true,
                         minimap: { enabled: false },
                         fontSize: 14,
                         scrollBeyondLastLine: false,
@@ -722,6 +714,36 @@ export default function Provisioning() {
                     }}
                 />
              </div>
+             {managedBlocksText.trim() && (
+               <div className="border-t border-[var(--border)] bg-[var(--bg-soft)]">
+                 <div className="px-6 py-3 text-xs font-semibold tracking-wide text-[var(--text-muted)] uppercase">
+                   {t('provisioning.managedServiceBlocks')}
+                 </div>
+                 <div className="h-64 border-t border-[var(--border)]">
+                   <Editor
+                     height="100%"
+                     defaultLanguage="dockerfile"
+                     theme={resolvedTheme === 'dark' ? 'vs-dark' : 'vs'}
+                     value={managedBlocksText}
+                     options={{
+                       automaticLayout: true,
+                       readOnly: true,
+                       domReadOnly: true,
+                       minimap: { enabled: false },
+                       fontSize: 13,
+                       lineNumbers: 'on',
+                       scrollBeyondLastLine: false,
+                       scrollbar: {
+                         alwaysConsumeMouseWheel: false,
+                       },
+                       renderLineHighlight: 'none',
+                       padding: { top: 12, bottom: 12 },
+                       fontFamily: "'JetBrains Mono', 'Fira Code', monospace"
+                     }}
+                   />
+                 </div>
+               </div>
+             )}
         </div>
       </div>
 
