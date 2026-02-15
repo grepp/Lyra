@@ -6,7 +6,6 @@ import { Link } from 'react-router-dom';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
-import Modal from '../components/Modal';
 import { decrypt } from '../utils/crypto';
 
 const XTERM_DARK_THEME = {
@@ -83,11 +82,6 @@ export default function TerminalPage() {
   const [activeTabId, setActiveTabId] = useState<string>(() => getInitialActiveTabId(getInitialTabs()));
   const tabCounterRef = useRef(1);
   const decryptedPrivateKeyRef = useRef<string | null>(null);
-  const [tmuxModalOpen, setTmuxModalOpen] = useState(false);
-  const [tmuxInstalling, setTmuxInstalling] = useState(false);
-  const [tmuxPromptChecked, setTmuxPromptChecked] = useState(false);
-  const [tmuxInstallPrivateKey, setTmuxInstallPrivateKey] = useState<string>('');
-  const [tmuxNotice, setTmuxNotice] = useState('');
   const terminalMessagesRef = useRef({
     connectedService: '',
     errorKeyNotFound: '',
@@ -119,64 +113,6 @@ export default function TerminalPage() {
     if (tabs.length === 0) return;
     tabCounterRef.current = Math.max(1, ...tabs.map((tab) => Math.floor(tab.number || 1)));
   }, [tabs]);
-
-  useEffect(() => {
-    if (!isUnlocked || isConfigured === false || tmuxPromptChecked) return;
-
-    const checkTmux = async () => {
-      let privateKey = '';
-      if (authMethod === 'key') {
-        const encrypted = localStorage.getItem('ssh_private_key_encrypted');
-        if (!encrypted || !masterPassword) {
-          setTmuxPromptChecked(true);
-          return;
-        }
-        try {
-          privateKey = await decrypt(encrypted, masterPassword);
-        } catch {
-          setTmuxPromptChecked(true);
-          return;
-        }
-      }
-
-      try {
-        const res = await axios.post('terminal/tmux/status', { privateKey });
-        if (res.data?.status !== 'success') {
-          setTmuxPromptChecked(true);
-          return;
-        }
-        if (!res.data.installed && res.data.canInstall) {
-          setTmuxInstallPrivateKey(privateKey);
-          setTmuxModalOpen(true);
-        }
-      } catch {
-        // noop: keep fallback behavior
-      } finally {
-        setTmuxPromptChecked(true);
-      }
-    };
-
-    checkTmux();
-  }, [isUnlocked, isConfigured, tmuxPromptChecked, authMethod, masterPassword]);
-
-  const handleInstallTmux = async () => {
-    try {
-      setTmuxInstalling(true);
-      const res = await axios.post('terminal/tmux/install', {
-        privateKey: tmuxInstallPrivateKey || undefined,
-      });
-      if (res.data?.status === 'success') {
-        setTmuxNotice(t('terminal.tmuxInstallSuccess'));
-      } else {
-        setTmuxNotice(res.data?.message || t('terminal.tmuxInstallFailed'));
-      }
-    } catch {
-      setTmuxNotice(t('terminal.tmuxInstallFailed'));
-    } finally {
-      setTmuxInstalling(false);
-      setTmuxModalOpen(false);
-    }
-  };
 
   // Check auth method and configuration first
   useEffect(() => {
@@ -474,14 +410,6 @@ export default function TerminalPage() {
 
   return (
     <div className="p-6 h-full flex flex-col space-y-6 bg-[var(--surface)]">
-      <Modal
-        isOpen={tmuxModalOpen}
-        onClose={() => setTmuxModalOpen(false)}
-        onConfirm={handleInstallTmux}
-        title={t('terminal.tmuxInstallTitle')}
-        message={tmuxInstalling ? t('terminal.tmuxInstallInProgress') : t('terminal.tmuxInstallMessage')}
-        type="confirm"
-      />
       <header className="flex justify-between items-center">
         <div>
           <h2 className="text-3xl font-bold text-[var(--text)]">{t('terminal.title')}</h2>
@@ -492,12 +420,6 @@ export default function TerminalPage() {
           {t('terminal.connectedViaWebsocket')}
         </div>
       </header>
-
-      {tmuxNotice && (
-        <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2 text-sm text-[var(--text-muted)]">
-          {tmuxNotice}
-        </div>
-      )}
 
       <div className="flex items-center gap-2 border-b border-[var(--border)] pb-2">
         <div className="flex items-center gap-2 overflow-x-auto min-w-0">
