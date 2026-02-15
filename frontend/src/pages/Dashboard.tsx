@@ -565,7 +565,28 @@ export default function Dashboard() {
                                     {renderAccessCell(env)}
                                 </td>
                                 <td className="px-6 py-4 text-[var(--text)]">
-                                    {env.gpu_indices.length > 0 ? env.gpu_indices.join(', ') : "-"}
+                                    {env.gpu_indices.length > 0 ? (
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        {env.gpu_indices.slice(0, 3).map((gpuIndex) => (
+                                          <span
+                                            key={`${env.id}-gpu-${gpuIndex}`}
+                                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-500/10 text-gray-400"
+                                          >
+                                            {gpuIndex}
+                                          </span>
+                                        ))}
+                                        {env.gpu_indices.length > 3 && (
+                                          <div className="relative group">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-500/10 text-gray-400">
+                                              +{env.gpu_indices.length - 3}
+                                            </span>
+                                            <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-[var(--text)] opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
+                                              {env.gpu_indices.join(' ')}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : "-"}
                                 </td>
                                 <td className="px-6 py-4 text-right space-x-2">
                                     {(() => {
