@@ -276,21 +276,45 @@ export default function Provisioning() {
       navigate('/');
     } catch (error) {
       console.error("Failed to create environment", error);
-      if (axios.isAxiosError(error) && error.response?.status === 409) {
+      if (axios.isAxiosError(error)) {
         const detail = error.response?.data?.detail;
-        if (detail?.code === 'duplicate_environment_name') {
+        const code = typeof detail === 'object' && detail ? String(detail.code || '') : '';
+        const message = typeof detail === 'object' && detail ? String(detail.message || '') : '';
+
+        if (code === 'duplicate_environment_name') {
           setErrors((prev) => ({ ...prev, name: t('provisioning.errorEnvironmentNameDuplicate') }));
           return;
         }
-        if (detail?.code === 'gpu_already_allocated') {
+        if (code === 'dockerfile_required') {
+          setErrors((prev) => ({ ...prev, dockerfile: t('provisioning.errorDockerfileRequired') }));
+          return;
+        }
+        if (code === 'gpu_already_allocated' || code === 'gpu_capacity_insufficient') {
           showToast(t('feedback.provisioning.allocateGpuFailed'), 'error');
           return;
         }
-      }
-      if (axios.isAxiosError(error) && error.response?.status === 400) {
-        const detail = error.response?.data?.detail;
-        if (detail?.code === 'invalid_gpu_selection') {
+        if (code === 'invalid_gpu_selection') {
           showToast(detail?.message || t('feedback.provisioning.invalidGpuSelection'), 'error');
+          return;
+        }
+        if (code === 'custom_host_port_conflict') {
+          showToast(message || t('feedback.provisioning.allocateCustomPortFailed'), 'error');
+          return;
+        }
+        if (
+          code === 'duplicate_custom_host_port' ||
+          code === 'duplicate_custom_container_port' ||
+          code === 'reserved_container_port'
+        ) {
+          showToast(message || t('feedback.provisioning.allocateCustomPortFailed'), 'error');
+          return;
+        }
+        if (code === 'port_allocation_failed') {
+          showAlert(t('feedback.provisioning.creationFailedTitle'), t('feedback.provisioning.portAllocationFailed'));
+          return;
+        }
+        if (code === 'task_enqueue_failed') {
+          showAlert(t('feedback.provisioning.creationFailedTitle'), t('feedback.provisioning.taskEnqueueFailed'));
           return;
         }
       }

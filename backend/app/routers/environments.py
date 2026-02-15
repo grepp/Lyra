@@ -211,11 +211,29 @@ def _validate_custom_ports(custom_ports: list[dict]):
         host_port = mapping["host_port"]
         container_port = mapping["container_port"]
         if host_port in host_ports:
-            raise HTTPException(status_code=400, detail=f"Duplicate host port in custom mappings: {host_port}")
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "duplicate_custom_host_port",
+                    "message": f"Duplicate host port in custom mappings: {host_port}",
+                },
+            )
         if container_port in container_ports:
-            raise HTTPException(status_code=400, detail=f"Duplicate container port in custom mappings: {container_port}")
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "duplicate_custom_container_port",
+                    "message": f"Duplicate container port in custom mappings: {container_port}",
+                },
+            )
         if container_port in RESERVED_CONTAINER_PORTS:
-            raise HTTPException(status_code=400, detail=f"Container port {container_port} is reserved")
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "reserved_container_port",
+                    "message": f"Container port {container_port} is reserved",
+                },
+            )
         host_ports.add(host_port)
         container_ports.add(container_port)
 
@@ -259,7 +277,10 @@ async def allocate_custom_ports(payload: CustomPortAllocateRequest, db: AsyncSes
 @router.post("/", response_model=EnvironmentResponse, status_code=status.HTTP_201_CREATED)
 async def create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(get_db)):
     if not env.dockerfile_content or not env.dockerfile_content.strip():
-        raise HTTPException(status_code=400, detail="Dockerfile content is required")
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "dockerfile_required", "message": "Dockerfile content is required"},
+        )
 
     existing = await db.execute(select(Environment).where(Environment.name == env.name))
     if existing.scalars().first():
@@ -294,7 +315,10 @@ async def create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(
         if len(available_indices) < env.gpu_count:
             raise HTTPException(
                 status_code=400,
-                detail=f"Not enough GPUs available. Requested: {env.gpu_count}, Available: {len(available_indices)}",
+                detail={
+                    "code": "gpu_capacity_insufficient",
+                    "message": f"Not enough GPUs available. Requested: {env.gpu_count}, Available: {len(available_indices)}",
+                },
             )
         gpu_indices = available_indices[: env.gpu_count]
 
@@ -305,61 +329,85 @@ async def create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(
         if mapping["host_port"] in blocked_host_ports:
             raise HTTPException(
                 status_code=409,
-                detail=f"Custom host port {mapping['host_port']} is already in use. Please regenerate ports.",
+                detail={
+                    "code": "custom_host_port_conflict",
+                    "message": f"Custom host port {mapping['host_port']} is already in use. Please regenerate ports.",
+                },
             )
 
+    await db.rollback()
+
     new_env = None
+    jupyter_token = secrets.token_urlsafe(32)
     for _ in range(MAX_PORT_ALLOCATION_RETRIES):
-        # Serialize GPU allocation + environment insert to minimize race conditions.
-        await db.execute(text("SELECT pg_advisory_xact_lock(:lock_key)"), {"lock_key": GPU_ALLOCATION_LOCK_KEY})
-
-        if requested_indices:
-            latest_used_indices = await _collect_used_gpu_indices(db)
-            conflicted = sorted(idx for idx in requested_indices if idx in latest_used_indices)
-            if conflicted:
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "code": "gpu_already_allocated",
-                        "message": f"Requested GPUs are already in use: {conflicted}",
-                    },
-                )
-            gpu_indices = sorted(requested_indices)
-        elif env.gpu_count > 0:
-            total_gpus = _detect_total_gpus()
-            latest_used_indices = await _collect_used_gpu_indices(db)
-            available_indices = [i for i in range(total_gpus) if i not in latest_used_indices]
-            if len(available_indices) < env.gpu_count:
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "code": "gpu_already_allocated",
-                        "message": "Not enough GPUs available at creation time",
-                    },
-                )
-            gpu_indices = available_indices[: env.gpu_count]
-
-        ssh_port, jupyter_port, code_port = await _allocate_ports(db)
-        candidate_env = Environment(
-            name=env.name,
-            container_user=env.container_user,
-            root_password=env.root_password,
-            dockerfile_content=env.dockerfile_content,
-            enable_jupyter=env.enable_jupyter,
-            enable_code_server=env.enable_code_server,
-            mount_config=[m.dict() for m in env.mount_config],
-            gpu_indices=gpu_indices,
-            ssh_port=ssh_port,
-            jupyter_port=jupyter_port,
-            code_port=code_port,
-            status="building",
-        )
-
-        db.add(candidate_env)
         try:
-            await db.commit()
-            await db.refresh(candidate_env)
-            new_env = candidate_env
+            async with db.begin():
+                # Serialize GPU allocation + environment insert.
+                await db.execute(
+                    text("SELECT pg_advisory_xact_lock(:lock_key)"),
+                    {"lock_key": GPU_ALLOCATION_LOCK_KEY},
+                )
+
+                if requested_indices:
+                    latest_used_indices = await _collect_used_gpu_indices(db)
+                    conflicted = sorted(idx for idx in requested_indices if idx in latest_used_indices)
+                    if conflicted:
+                        raise HTTPException(
+                            status_code=409,
+                            detail={
+                                "code": "gpu_already_allocated",
+                                "message": f"Requested GPUs are already in use: {conflicted}",
+                            },
+                        )
+                    gpu_indices = sorted(requested_indices)
+                elif env.gpu_count > 0:
+                    total_gpus = _detect_total_gpus()
+                    latest_used_indices = await _collect_used_gpu_indices(db)
+                    available_indices = [i for i in range(total_gpus) if i not in latest_used_indices]
+                    if len(available_indices) < env.gpu_count:
+                        raise HTTPException(
+                            status_code=409,
+                            detail={
+                                "code": "gpu_already_allocated",
+                                "message": "Not enough GPUs available at creation time",
+                            },
+                        )
+                    gpu_indices = available_indices[: env.gpu_count]
+
+                try:
+                    ssh_port, jupyter_port, code_port = await _allocate_ports(db)
+                except HTTPException as port_error:
+                    if port_error.status_code == 503:
+                        raise HTTPException(
+                            status_code=503,
+                            detail={
+                                "code": "port_allocation_failed",
+                                "message": "Failed to allocate unique ports. Please try again.",
+                            },
+                        ) from port_error
+                    raise
+
+                candidate_env = Environment(
+                    name=env.name,
+                    container_user=env.container_user,
+                    root_password=env.root_password,
+                    dockerfile_content=env.dockerfile_content,
+                    enable_jupyter=env.enable_jupyter,
+                    enable_code_server=env.enable_code_server,
+                    mount_config=[m.dict() for m in env.mount_config],
+                    gpu_indices=gpu_indices,
+                    ssh_port=ssh_port,
+                    jupyter_port=jupyter_port,
+                    code_port=code_port,
+                    status="creating",
+                )
+                db.add(candidate_env)
+                await db.flush()
+
+                db.add(Setting(key=f"jupyter_token:{candidate_env.id}", value=jupyter_token))
+                db.add(Setting(key=f"custom_ports:{candidate_env.id}", value=json.dumps(custom_ports)))
+                new_env = candidate_env
+
             break
         except IntegrityError as error:
             await db.rollback()
@@ -372,16 +420,64 @@ async def create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(
     if new_env is None:
         raise HTTPException(
             status_code=503,
-            detail="Failed to allocate unique ports after several retries. Please try again.",
+            detail={
+                "code": "port_allocation_failed",
+                "message": "Failed to allocate unique ports after several retries. Please try again.",
+            },
         )
 
-    jupyter_token = secrets.token_urlsafe(32)
-    db.add(Setting(key=f"jupyter_token:{new_env.id}", value=jupyter_token))
-    db.add(Setting(key=f"custom_ports:{new_env.id}", value=json.dumps(custom_ports)))
-    await db.commit()
+    try:
+        create_environment_task.delay(str(new_env.id))
+    except Exception as enqueue_error:
+        compensation_done = False
+        try:
+            async with db.begin():
+                rollback_env = await db.execute(select(Environment).where(Environment.id == new_env.id))
+                env_to_remove = rollback_env.scalars().first()
+                if env_to_remove:
+                    token_result = await db.execute(
+                        select(Setting).where(Setting.key == f"jupyter_token:{new_env.id}")
+                    )
+                    token_setting = token_result.scalars().first()
+                    if token_setting:
+                        await db.delete(token_setting)
 
-    # Trigger Celery Task
-    create_environment_task.delay(new_env.id)
+                    custom_ports_result = await db.execute(
+                        select(Setting).where(Setting.key == f"custom_ports:{new_env.id}")
+                    )
+                    custom_ports_setting = custom_ports_result.scalars().first()
+                    if custom_ports_setting:
+                        await db.delete(custom_ports_setting)
+
+                    await db.delete(env_to_remove)
+                compensation_done = True
+        except Exception:
+            await db.rollback()
+
+        if not compensation_done:
+            try:
+                async with db.begin():
+                    failed_env_result = await db.execute(select(Environment).where(Environment.id == new_env.id))
+                    failed_env = failed_env_result.scalars().first()
+                    if failed_env:
+                        failed_env.status = "error"
+            except Exception:
+                await db.rollback()
+
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "task_enqueue_failed",
+                "message": "Failed to enqueue provisioning task. Please try again.",
+            },
+        ) from enqueue_error
+
+    async with db.begin():
+        refreshed = await db.execute(select(Environment).where(Environment.id == new_env.id))
+        created_env = refreshed.scalars().first()
+        if created_env:
+            created_env.status = "building"
+            new_env = created_env
 
     env_dict = {**new_env.__dict__, "custom_ports": custom_ports}
     env_dict.pop("_sa_instance_state", None)
