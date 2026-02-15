@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { ChevronDown, ChevronUp, Code2, HardDrive, HelpCircle, LayoutTemplate, Network, Play, RefreshCw, Square, SquareTerminal, Trash2, X } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +29,8 @@ interface Environment {
   ssh_port: number;
   jupyter_port: number;
   code_port: number;
+  enable_jupyter?: boolean;
+  enable_code_server?: boolean;
   created_at: string;
   mount_config: MountConfig[];
   custom_ports: CustomPortMapping[];
@@ -207,6 +209,87 @@ export default function Dashboard() {
       setIsNoticeOpen(false);
     }
   }, [hasAnnouncement, announcementMarkdown]);
+
+  const renderAccessCell = (env: Environment): ReactNode => {
+    if (env.status === 'stopped' || env.status === 'error') {
+      return <span>-</span>;
+    }
+
+    const isRunning = env.status === 'running';
+    const jupyterEnabled = env.enable_jupyter !== false;
+    const codeEnabled = env.enable_code_server !== false;
+
+    const accessItems: Array<{ key: string; node: ReactNode }> = [
+      {
+        key: 'ssh',
+        node: (
+          <div className="relative group">
+            <button
+              onClick={() => copyEnvSshCommand(env)}
+              disabled={!isRunning}
+              className="p-1 hover:bg-[var(--bg-soft)] rounded text-[var(--text-muted)] hover:text-blue-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <SquareTerminal size={14} />
+            </button>
+            <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-[var(--text)] opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
+              {isRunning
+                ? t('dashboard.copySshCommand', { port: env.ssh_port })
+                : t('dashboard.environmentMustBeRunning', { port: env.ssh_port })}
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: 'jupyter',
+        node: jupyterEnabled ? (
+          <div className="relative group">
+            <button
+              onClick={() => openJupyter(env)}
+              disabled={!isRunning}
+              className="p-1 hover:bg-[var(--bg-soft)] rounded text-[var(--text-muted)] hover:text-orange-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <LayoutTemplate size={14} />
+            </button>
+            <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-[var(--text)] opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
+              {t('dashboard.openJupyterLab')}
+            </div>
+          </div>
+        ) : (
+          <span className="text-[var(--text-muted)]">-</span>
+        ),
+      },
+      {
+        key: 'code',
+        node: codeEnabled ? (
+          <div className="relative group">
+            <button
+              onClick={() => openCodeServer(env)}
+              disabled={!isRunning}
+              className="p-1 hover:bg-[var(--bg-soft)] rounded text-[var(--text-muted)] hover:text-cyan-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Code2 size={14} />
+            </button>
+            <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-[var(--text)] opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
+              {t('dashboard.openCodeServer')}
+            </div>
+          </div>
+        ) : (
+          <span className="text-[var(--text-muted)]">-</span>
+        ),
+      },
+    ];
+
+    return (
+      <div className="flex items-center gap-2">
+        {accessItems.map((item, index) => (
+          <div key={item.key} className="flex items-center gap-2">
+            {index > 0 && <span className="text-[var(--text-muted)]">/</span>}
+            {item.node}
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="p-6 space-y-6 relative">
@@ -464,50 +547,7 @@ export default function Dashboard() {
                                     </div>
                                 </td>
                                 <td className="px-6 py-4 text-[var(--text)]">
-                                    {env.status === 'stopped' || env.status === 'error' ? (
-                                        <span>-</span>
-                                    ) : (
-                                        <div className="flex items-center gap-2">
-                                            <div className="relative group">
-                                                <button
-                                                    onClick={() => copyEnvSshCommand(env)}
-                                                    disabled={env.status !== 'running'}
-                                                    className="p-1 hover:bg-[var(--bg-soft)] rounded text-[var(--text-muted)] hover:text-blue-400 transition-colors"
-                                                >
-                                                    <SquareTerminal size={14} />
-                                                </button>
-                                                <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-[var(--text)] opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
-                                                    {env.status === 'running'
-                                                      ? t('dashboard.copySshCommand', { port: env.ssh_port })
-                                                      : t('dashboard.environmentMustBeRunning', { port: env.ssh_port })}
-                                                </div>
-                                            </div>
-                                            <span className="text-[var(--text-muted)]">/</span>
-                                            <div className="relative group">
-                                                <button
-                                                    onClick={() => openJupyter(env)}
-                                                    className="p-1 hover:bg-[var(--bg-soft)] rounded text-[var(--text-muted)] hover:text-orange-400 transition-colors"
-                                                >
-                                                    <LayoutTemplate size={14} />
-                                                </button>
-                                                <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-[var(--text)] opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
-                                                    {t('dashboard.openJupyterLab')}
-                                                </div>
-                                            </div>
-                                            <span className="text-[var(--text-muted)]">/</span>
-                                            <div className="relative group">
-                                                <button
-                                                    onClick={() => openCodeServer(env)}
-                                                    className="p-1 hover:bg-[var(--bg-soft)] rounded text-[var(--text-muted)] hover:text-cyan-400 transition-colors"
-                                                >
-                                                    <Code2 size={14} />
-                                                </button>
-                                                <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-[var(--text)] opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
-                                                    {t('dashboard.openCodeServer')}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
+                                    {renderAccessCell(env)}
                                 </td>
                                 <td className="px-6 py-4 text-[var(--text)]">
                                     {env.gpu_indices.length > 0 ? env.gpu_indices.join(', ') : "-"}
