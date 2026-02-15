@@ -119,6 +119,27 @@ npm --prefix frontend run lint
 npm --prefix frontend run build
 ```
 
+### Managed Dockerfile Behavior
+
+- Provisioning service checkboxes (`JupyterLab`, `code-server`) add/remove managed Dockerfile blocks automatically.
+- Managed blocks are read-only in the editor. User edits are preserved only in the user-authored Dockerfile area.
+- Template save stores only the user-authored Dockerfile area; managed blocks are excluded.
+- On environment creation, the final Dockerfile is composed from:
+  - user-authored Dockerfile content
+  - currently selected managed service blocks
+
+### Service Installation Policy
+
+- Runtime auto-install in worker is disabled for Jupyter and code-server.
+- Required tools must be installed at image build time through Dockerfile (including managed blocks).
+- Worker starts services conditionally by feature flags:
+  - `enable_jupyter`
+  - `enable_code_server`
+- Jupyter launch API returns `409` when Jupyter is disabled for that environment.
+- Exposed host ports follow enabled services:
+  - SSH is always exposed
+  - Jupyter/code-server ports are exposed only when enabled
+
 ---
 
 ## Theme Guide
@@ -181,3 +202,10 @@ Manual checks:
    - Environment create/start/stop/delete
    - Template load/save/delete
    - SSH settings save/test
+5. Verify managed Dockerfile behavior:
+   - Toggle Jupyter/code-server checkboxes and confirm managed blocks are added/removed in Dockerfile editor.
+   - Confirm managed block text cannot be edited directly (auto-restored).
+   - Save template and confirm managed block markers are not included in template Dockerfile content.
+6. Verify service flag behavior:
+   - Dashboard Access shows `-` per disabled service.
+   - Jupyter launch returns `409` when Jupyter is disabled for the environment.

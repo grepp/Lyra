@@ -120,7 +120,6 @@ const enCommon = {
     enableJupyter: 'Enable JupyterLab',
     enableCodeServer: 'Enable code-server',
     managedBlockLockedNotice: 'Managed service blocks are read-only and updated from the checkboxes.',
-    buildConfiguration: 'Build Configuration',
     loadTemplateTitle: 'Load Template',
     saveAsTemplate: 'Save as Template',
     templateName: 'Template Name',

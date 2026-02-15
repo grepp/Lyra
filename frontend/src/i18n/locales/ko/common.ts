@@ -119,7 +119,6 @@ const koCommon = {
     enableJupyter: 'JupyterLab 활성화',
     enableCodeServer: 'code-server 활성화',
     managedBlockLockedNotice: '관리되는 서비스 블록은 수정할 수 없으며 체크박스로만 변경됩니다.',
-    buildConfiguration: '빌드 설정',
     loadTemplateTitle: '템플릿 불러오기',
     saveAsTemplate: '템플릿으로 저장',
     templateName: '템플릿 이름',
