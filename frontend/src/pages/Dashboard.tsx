@@ -39,6 +39,7 @@ interface Environment {
 
 const ENVS_CACHE_KEY = 'lyra.dashboard.environments';
 const TERMINAL_ACTION_QUEUE_KEY = 'lyra.terminal.pending_action';
+const NOTICE_OPEN_KEY = 'lyra.dashboard.notice_open';
 
 export default function Dashboard() {
   const { showToast } = useToast();
@@ -46,7 +47,15 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { announcementMarkdown } = useApp();
   const hasAnnouncement = announcementMarkdown.trim().length > 0;
-  const [isNoticeOpen, setIsNoticeOpen] = useState(false);
+  const [isNoticeOpen, setIsNoticeOpen] = useState(() => {
+    try {
+      if (typeof window === 'undefined') return false;
+      const stored = window.localStorage.getItem(NOTICE_OPEN_KEY);
+      return stored === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [environments, setEnvironments] = useState<Environment[]>(() => {
     try {
       if (typeof window === 'undefined') return [];
@@ -214,8 +223,29 @@ export default function Dashboard() {
   useEffect(() => {
     if (!hasAnnouncement) {
       setIsNoticeOpen(false);
+      return;
+    }
+    try {
+      const stored = window.localStorage.getItem(NOTICE_OPEN_KEY);
+      if (stored === null) {
+        setIsNoticeOpen(true);
+        window.localStorage.setItem(NOTICE_OPEN_KEY, 'true');
+      } else {
+        setIsNoticeOpen(stored === 'true');
+      }
+    } catch {
+      setIsNoticeOpen(true);
     }
   }, [hasAnnouncement, announcementMarkdown]);
+
+  useEffect(() => {
+    if (!hasAnnouncement) return;
+    try {
+      window.localStorage.setItem(NOTICE_OPEN_KEY, isNoticeOpen ? 'true' : 'false');
+    } catch {
+      // Ignore storage write failures
+    }
+  }, [hasAnnouncement, isNoticeOpen]);
 
   const renderAccessCell = (env: Environment): ReactNode => {
     if (env.status === 'stopped' || env.status === 'error') {
