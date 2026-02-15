@@ -104,6 +104,9 @@ const enCommon = {
     gpuAllocation: 'GPU Allocation',
     gpus: 'GPUs',
     maxAvailable: '{{count}} (Max Available)',
+    gpuOption: 'GPU #{{index}}',
+    removeGpu: 'Remove GPU',
+    noGpuSelected: 'No GPUs selected',
     currentSystemUsage: 'Current System Usage: {{used}} / {{total}} GPUs active',
     volumeMounts: 'Volume Mounts',
     noVolumesMounted: 'No volumes mounted',
@@ -235,6 +238,8 @@ const enCommon = {
     },
     provisioning: {
       allocateCustomPortFailed: 'Unable to allocate a custom port.',
+      allocateGpuFailed: 'No allocatable GPU is available right now.',
+      invalidGpuSelection: 'Selected GPU indices are invalid.',
       creationFailedTitle: 'Creation Failed',
       creationFailedMessage: 'Failed to create environment. Check console for details.',
       templateSaved: 'Template has been saved.',

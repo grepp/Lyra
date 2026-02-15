@@ -120,9 +120,10 @@ export default function Provisioning() {
       });
   };
 
-  const [gpuCount, setGpuCount] = useState(0);
-  const [maxGpus, setMaxGpus] = useState(0);
+  const [selectedGpuIndices, setSelectedGpuIndices] = useState<number[]>([]);
+  const [availableGpuIndices, setAvailableGpuIndices] = useState<number[]>([]);
   const [totalGpus, setTotalGpus] = useState(0);
+  const [usedGpuCount, setUsedGpuCount] = useState(0);
 
   const [mounts, setMounts] = useState<MountPoint[]>([]);
   const [customPorts, setCustomPorts] = useState<CustomPortMapping[]>([]);
@@ -136,8 +137,15 @@ export default function Provisioning() {
     // 1. Fetch GPU Info
     axios.get('resources/gpu')
       .then(res => {
-         setMaxGpus(res.data.available);
-         setTotalGpus(res.data.total);
+         const total = Number(res.data?.total || 0);
+         const used = Number(res.data?.used || 0);
+         const availableIndices = Array.isArray(res.data?.available_indices)
+           ? res.data.available_indices.map((idx: number) => Number(idx)).filter((idx: number) => Number.isInteger(idx) && idx >= 0)
+           : [];
+         setTotalGpus(total);
+         setUsedGpuCount(used);
+         setAvailableGpuIndices(availableIndices);
+         setSelectedGpuIndices((prev) => prev.filter((idx) => availableIndices.includes(idx)));
 
          // 2. Load Template if exists
          // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -154,17 +162,28 @@ export default function Provisioning() {
              // Clear state so refresh doesn't reload template
              window.history.replaceState({}, document.title);
 
-             // Default GPU count fallback
-             setGpuCount(0);
-
              // Show a toast or notification? (Optional)
-         } else {
-             // Default behavior
-             setGpuCount(0);
          }
       })
       .catch(err => console.error("Failed to fetch GPU resources", err));
   }, [location.state]);
+
+  const handleAddGpuSelection = () => {
+    const selectable = availableGpuIndices.filter((idx) => !selectedGpuIndices.includes(idx));
+    if (selectable.length === 0) {
+      showToast(t('feedback.provisioning.allocateGpuFailed'), 'error');
+      return;
+    }
+    setSelectedGpuIndices((prev) => [...prev, selectable[0]]);
+  };
+
+  const handleRemoveGpuSelection = (index: number) => {
+    setSelectedGpuIndices((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleGpuSelectionChange = (index: number, gpuIndex: number) => {
+    setSelectedGpuIndices((prev) => prev.map((value, i) => (i === index ? gpuIndex : value)));
+  };
 
   const handleAddMount = () => {
     setMounts([...mounts, { host_path: '', container_path: '', mode: 'rw' }]);
@@ -247,7 +266,8 @@ export default function Provisioning() {
         dockerfile_content: renderedDockerfile,
         enable_jupyter: enableJupyter,
         enable_code_server: enableCodeServer,
-        gpu_count: gpuCount
+        gpu_count: selectedGpuIndices.length,
+        selected_gpu_indices: selectedGpuIndices,
       };
 
       // Relative path works thanks to Nginx proxy
@@ -260,6 +280,17 @@ export default function Provisioning() {
         const detail = error.response?.data?.detail;
         if (detail?.code === 'duplicate_environment_name') {
           setErrors((prev) => ({ ...prev, name: t('provisioning.errorEnvironmentNameDuplicate') }));
+          return;
+        }
+        if (detail?.code === 'gpu_already_allocated') {
+          showToast(t('feedback.provisioning.allocateGpuFailed'), 'error');
+          return;
+        }
+      }
+      if (axios.isAxiosError(error) && error.response?.status === 400) {
+        const detail = error.response?.data?.detail;
+        if (detail?.code === 'invalid_gpu_selection') {
+          showToast(detail?.message || t('feedback.provisioning.invalidGpuSelection'), 'error');
           return;
         }
       }
@@ -483,39 +514,53 @@ export default function Provisioning() {
 
           {/* Resources */}
           <section className="bg-[var(--bg-elevated)] p-6 rounded-xl border border-[var(--border)] space-y-4">
-            <h3 className="text-lg font-semibold text-[var(--text)] flex items-center gap-2">
-              <span className="w-1 h-5 bg-purple-500 rounded-full"></span>
-              {t('provisioning.resourcesTitle')}
-            </h3>
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-[var(--text)] flex items-center gap-2">
+                <span className="w-1 h-5 bg-purple-500 rounded-full"></span>
+                {t('provisioning.resourcesTitle')}
+              </h3>
+              <button onClick={handleAddGpuSelection} className="p-1 hover:bg-[var(--bg-soft)] rounded text-[var(--text-muted)] hover:text-[var(--text)] transition-colors">
+                <Plus size={18} />
+              </button>
+            </div>
 
-            <div className="space-y-4">
-              <div className="flex justify-between items-end">
-                  <label className="text-sm font-medium text-[var(--text-muted)]">{t('provisioning.gpuAllocation')}</label>
-                  <span className="text-2xl font-bold text-purple-400">{gpuCount} <span className="text-sm font-normal text-[var(--text-muted)]">{t('provisioning.gpus')}</span></span>
-              </div>
-
-              <div className="relative pt-6 pb-2">
-                  <input
-                    type="range"
-                    min="0"
-                    max={maxGpus || 0}
-                    disabled={!maxGpus || maxGpus === 0}
-                    value={gpuCount}
-                    onChange={(e) => setGpuCount(parseInt(e.target.value))}
-                    className={clsx(
-                      "w-full h-2 rounded-lg appearance-none border border-[var(--border)]",
-                      (!maxGpus || maxGpus === 0) ? "bg-[var(--bg-soft)] cursor-not-allowed" : "bg-[var(--bg-soft)] cursor-pointer accent-purple-500"
-                    )}
-                  />
-                  <div className="flex justify-between text-xs text-[var(--text-muted)] mt-2">
-                      <span>0</span>
-                      <span>{t('provisioning.maxAvailable', { count: maxGpus || 0 })}</span>
+            <div className="space-y-3">
+              {selectedGpuIndices.map((gpuIndex, idx) => (
+                <div key={`${gpuIndex}-${idx}`} className="bg-[var(--bg-soft)] p-4 rounded-xl border border-[var(--border)] flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <select
+                      value={gpuIndex}
+                      onChange={(e) => handleGpuSelectionChange(idx, parseInt(e.target.value, 10))}
+                      className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2 text-sm text-[var(--text)] focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 cursor-pointer"
+                    >
+                      {availableGpuIndices.map((option) => {
+                        const isChosenByOther = selectedGpuIndices.some((selected, selectedIdx) => selectedIdx !== idx && selected === option);
+                        return (
+                          <option key={option} value={option} disabled={isChosenByOther}>
+                            {t('provisioning.gpuOption', { index: option })}
+                          </option>
+                        );
+                      })}
+                    </select>
                   </div>
-              </div>
+                  <button
+                    onClick={() => handleRemoveGpuSelection(idx)}
+                    className="p-2 text-[var(--text-muted)] hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
+                    title={t('provisioning.removeGpu')}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+              {selectedGpuIndices.length === 0 && (
+                <p className="text-sm text-[var(--text-muted)] text-center py-4 bg-[var(--bg-soft)] rounded-lg border border-dashed border-[var(--border)]">
+                  {t('provisioning.noGpuSelected')}
+                </p>
+              )}
+            </div>
 
-              <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg text-xs text-purple-300">
-                 {t('provisioning.currentSystemUsage', { used: (totalGpus || 0) - (maxGpus || 0), total: totalGpus || 0 })}
-              </div>
+            <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg text-xs text-purple-300">
+              {t('provisioning.currentSystemUsage', { used: usedGpuCount, total: totalGpus || 0 })}
             </div>
           </section>
 

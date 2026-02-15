@@ -38,12 +38,20 @@ async def get_gpu_resources(db: AsyncSession = Depends(get_db)):
         if env.gpu_indices:
             used_indices.update(env.gpu_indices)
 
-    used_count = len(used_indices)
+    used_indices_sorted = sorted(used_indices)
+    available_indices = [i for i in range(total_gpus) if i not in used_indices]
+    used_count = len(used_indices_sorted)
     available = total_gpus - used_count
     if available < 0:
         available = 0
 
-    return {"available": available, "total": total_gpus, "used": used_count}
+    return {
+        "available": available,
+        "total": total_gpus,
+        "used": used_count,
+        "used_indices": used_indices_sorted,
+        "available_indices": available_indices,
+    }
 
 
 @router.get("/nodes")

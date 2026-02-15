@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import text
 from typing import List
 from ..database import get_db
 from ..models import Environment, Setting
@@ -31,6 +32,7 @@ MAX_PORT_ALLOCATION_RETRIES = 8
 CUSTOM_HOST_PORT_RANGE = (35001, 60000)
 CUSTOM_CONTAINER_PORT_RANGE = (10000, 20000)
 RESERVED_CONTAINER_PORTS = {22, 8080, 8888}
+GPU_ALLOCATION_LOCK_KEY = 93821
 
 
 def _is_name_unique_violation(error: IntegrityError) -> bool:
@@ -49,6 +51,28 @@ def _cleanup_expired_jupyter_tickets():
     ]
     for ticket in expired:
         jupyter_launch_tickets.pop(ticket, None)
+
+
+def _detect_total_gpus() -> int:
+    import pynvml
+
+    try:
+        pynvml.nvmlInit()
+        total_gpus = pynvml.nvmlDeviceGetCount()
+        pynvml.nvmlShutdown()
+        return int(total_gpus)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail="Failed to detect GPUs on host") from exc
+
+
+async def _collect_used_gpu_indices(db: AsyncSession) -> set[int]:
+    result = await db.execute(select(Environment).where(Environment.status.in_(["running", "building"])))
+    active_envs = result.scalars().all()
+    used_indices: set[int] = set()
+    for active in active_envs:
+        if active.gpu_indices:
+            used_indices.update(active.gpu_indices)
+    return used_indices
 
 
 async def _get_jupyter_token(db: AsyncSession, environment_id: str) -> str | None:
@@ -234,11 +258,6 @@ async def allocate_custom_ports(payload: CustomPortAllocateRequest, db: AsyncSes
 
 @router.post("/", response_model=EnvironmentResponse, status_code=status.HTTP_201_CREATED)
 async def create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(get_db)):
-    # Logic to find available ports and GPUs will go here
-    # For now, we will mock these values
-
-    import pynvml
-
     if not env.dockerfile_content or not env.dockerfile_content.strip():
         raise HTTPException(status_code=400, detail="Dockerfile content is required")
 
@@ -249,36 +268,34 @@ async def create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(
             detail={"code": "duplicate_environment_name", "message": "Environment name already exists"},
         )
 
-    # Real GPU Allocation Logic
-    gpu_indices = []
-    if env.gpu_count > 0:
-        total_gpus = 0
-        try:
-            pynvml.nvmlInit()
-            total_gpus = pynvml.nvmlDeviceGetCount()
-            pynvml.nvmlShutdown()
-        except Exception:
-            # If NVML fails, assume 0 or handle accordingly
-            raise HTTPException(status_code=500, detail="Failed to detect GPUs on host")
+    # GPU allocation logic
+    gpu_indices: list[int] = []
+    requested_indices = [int(idx) for idx in (env.selected_gpu_indices or [])]
+    if requested_indices:
+        if len(set(requested_indices)) != len(requested_indices):
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "invalid_gpu_selection", "message": "Duplicate GPU indices are not allowed"},
+            )
 
-        # Find currently used GPUs
-        result = await db.execute(select(Environment).where(Environment.status.in_(["running", "building"])))
-        active_envs = result.scalars().all()
-        used_indices = set()
-        for active in active_envs:
-            if active.gpu_indices:
-                used_indices.update(active.gpu_indices)
+        total_gpus = _detect_total_gpus()
+        invalid = sorted(idx for idx in requested_indices if idx < 0 or idx >= total_gpus)
+        if invalid:
+            raise HTTPException(
+                status_code=400,
+                detail={"code": "invalid_gpu_selection", "message": f"Invalid GPU indices: {invalid}"},
+            )
 
-        # Find available indices
+        gpu_indices = sorted(requested_indices)
+    elif env.gpu_count > 0:
+        total_gpus = _detect_total_gpus()
+        used_indices = await _collect_used_gpu_indices(db)
         available_indices = [i for i in range(total_gpus) if i not in used_indices]
-
         if len(available_indices) < env.gpu_count:
             raise HTTPException(
                 status_code=400,
                 detail=f"Not enough GPUs available. Requested: {env.gpu_count}, Available: {len(available_indices)}",
             )
-
-        # Allocate
         gpu_indices = available_indices[: env.gpu_count]
 
     custom_ports = _normalize_custom_ports(env.custom_ports)
@@ -293,6 +310,35 @@ async def create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(
 
     new_env = None
     for _ in range(MAX_PORT_ALLOCATION_RETRIES):
+        # Serialize GPU allocation + environment insert to minimize race conditions.
+        await db.execute(text("SELECT pg_advisory_xact_lock(:lock_key)"), {"lock_key": GPU_ALLOCATION_LOCK_KEY})
+
+        if requested_indices:
+            latest_used_indices = await _collect_used_gpu_indices(db)
+            conflicted = sorted(idx for idx in requested_indices if idx in latest_used_indices)
+            if conflicted:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "gpu_already_allocated",
+                        "message": f"Requested GPUs are already in use: {conflicted}",
+                    },
+                )
+            gpu_indices = sorted(requested_indices)
+        elif env.gpu_count > 0:
+            total_gpus = _detect_total_gpus()
+            latest_used_indices = await _collect_used_gpu_indices(db)
+            available_indices = [i for i in range(total_gpus) if i not in latest_used_indices]
+            if len(available_indices) < env.gpu_count:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "gpu_already_allocated",
+                        "message": "Not enough GPUs available at creation time",
+                    },
+                )
+            gpu_indices = available_indices[: env.gpu_count]
+
         ssh_port, jupyter_port, code_port = await _allocate_ports(db)
         candidate_env = Environment(
             name=env.name,

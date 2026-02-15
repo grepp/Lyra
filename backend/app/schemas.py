@@ -24,6 +24,7 @@ class EnvironmentBase(BaseModel):
     mount_config: List[MountConfig] = []
     custom_ports: List[CustomPortMapping] = []
     gpu_count: int = 0
+    selected_gpu_indices: List[int] = []
 
 
 class EnvironmentCreate(EnvironmentBase):

@@ -103,6 +103,9 @@ const koCommon = {
     gpuAllocation: 'GPU 할당',
     gpus: 'GPU',
     maxAvailable: '{{count}} (최대 사용 가능)',
+    gpuOption: 'GPU #{{index}}',
+    removeGpu: 'GPU 제거',
+    noGpuSelected: '선택된 GPU가 없습니다',
     currentSystemUsage: '현재 시스템 사용량: {{used}} / {{total}} GPU 사용 중',
     volumeMounts: '볼륨 마운트',
     noVolumesMounted: '마운트된 볼륨이 없습니다',
@@ -234,6 +237,8 @@ const koCommon = {
     },
     provisioning: {
       allocateCustomPortFailed: '커스텀 포트를 할당할 수 없습니다.',
+      allocateGpuFailed: '현재 할당 가능한 GPU가 없습니다.',
+      invalidGpuSelection: '선택한 GPU 인덱스가 올바르지 않습니다.',
       creationFailedTitle: '생성 실패',
       creationFailedMessage: '환경 생성에 실패했습니다. 콘솔 로그를 확인해주세요.',
       templateSaved: '템플릿이 저장되었습니다.',
