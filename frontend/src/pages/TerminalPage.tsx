@@ -193,13 +193,13 @@ export default function TerminalPage() {
 
   if (isConfigured === false) {
       return (
-          <div className="p-8 max-w-7xl mx-auto space-y-8 relative">
+          <div className="p-6 max-w-7xl mx-auto space-y-6 relative">
               <header>
                   <h2 className="text-3xl font-bold text-[var(--text)] tracking-tight">{t('terminal.title')}</h2>
                   <p className="text-[var(--text-muted)] mt-1">{t('terminal.subtitle')}</p>
               </header>
 
-              <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] p-12 text-center text-[var(--text-muted)] flex flex-col items-center gap-4">
+              <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] p-6 text-center text-[var(--text-muted)] flex flex-col items-center gap-4">
                   <div className="p-4 bg-[var(--bg-soft)] rounded-full">
                       <AlertCircle size={32} className="text-amber-500" />
                   </div>
@@ -222,7 +222,7 @@ export default function TerminalPage() {
   if (!isUnlocked) {
     return (
         <div className="h-full flex items-center justify-center bg-[var(--surface)] p-6">
-            <div className="max-w-md w-full bg-[var(--bg-elevated)] rounded-2xl border border-[var(--border)] p-8 shadow-2xl">
+            <div className="max-w-md w-full bg-[var(--bg-elevated)] rounded-2xl border border-[var(--border)] p-6 shadow-2xl">
                 <div className="flex flex-col items-center text-center space-y-4">
                     <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center text-blue-400 mb-2">
                         <Lock size={32} />
@@ -265,7 +265,7 @@ export default function TerminalPage() {
   }
 
   return (
-    <div className="p-8 h-full flex flex-col space-y-8 bg-[var(--surface)]">
+    <div className="p-6 h-full flex flex-col space-y-6 bg-[var(--surface)]">
       <header className="flex justify-between items-center">
         <div>
           <h2 className="text-3xl font-bold text-[var(--text)]">{t('terminal.title')}</h2>

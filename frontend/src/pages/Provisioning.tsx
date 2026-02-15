@@ -241,7 +241,7 @@ export default function Provisioning() {
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 pb-20 relative">
+    <div className="p-6 max-w-7xl mx-auto space-y-6 pb-16 relative">
       <Modal
           isOpen={modalConfig.isOpen}
           onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
@@ -325,7 +325,7 @@ export default function Provisioning() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Configuration */}
         <div className="lg:col-span-1 space-y-6">
 

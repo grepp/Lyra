@@ -209,7 +209,7 @@ export default function Dashboard() {
   }, [hasAnnouncement, announcementMarkdown]);
 
   return (
-    <div className="p-8 space-y-8 relative">
+    <div className="p-6 space-y-6 relative">
       <Modal
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
@@ -409,9 +409,9 @@ export default function Dashboard() {
         </div>
         <div className="w-full text-left">
             {!hasLoadedOnce && loading ? (
-                 <div className="p-8 text-center text-[var(--text-muted)]">{t('messages.loadingEnvironments')}</div>
+                 <div className="p-6 text-center text-[var(--text-muted)]">{t('messages.loadingEnvironments')}</div>
             ) : environments.length === 0 ? (
-                 <div className="p-8 text-center text-[var(--text-muted)]">{t('messages.noEnvironments')}</div>
+                 <div className="p-6 text-center text-[var(--text-muted)]">{t('messages.noEnvironments')}</div>
             ) : (
                 <table className="w-full">
                     <thead className="bg-[var(--bg-soft)] text-[var(--text-muted)] text-sm uppercase">

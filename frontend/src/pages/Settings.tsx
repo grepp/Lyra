@@ -403,7 +403,7 @@ export default function Settings() {
   const resourceCardClass = `rounded-xl border border-[var(--border)] ${fieldBgClass} p-4 space-y-3`;
 
   return (
-    <div className="p-8 space-y-8 max-w-7xl mx-auto">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {announcementEditorOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm">
           <div className="w-full max-w-4xl overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] shadow-2xl">
@@ -457,7 +457,7 @@ export default function Settings() {
         <p className="mt-1 text-[var(--text-muted)]">{t('settings.subtitle')}</p>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
         {/* Branding Section */}
         <section className={sectionClass}>
           <div className={sectionHeaderClass}>

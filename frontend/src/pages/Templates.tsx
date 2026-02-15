@@ -76,7 +76,7 @@ export default function Templates() {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 relative">
+    <div className="p-6 max-w-7xl mx-auto space-y-6 relative">
       <Modal
           isOpen={modalConfig.isOpen}
           onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
@@ -165,7 +165,7 @@ export default function Templates() {
               <p className="text-[var(--text-muted)]">{t('templates.loadingTemplates')}</p>
           </div>
       ) : templates.length === 0 ? (
-          <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] p-12 text-center text-[var(--text-muted)] flex flex-col items-center gap-4">
+          <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] p-6 text-center text-[var(--text-muted)] flex flex-col items-center gap-4">
             <div className="p-4 bg-[var(--bg-soft)] rounded-full">
                 <AlertCircle size={32} className="text-amber-500" />
             </div>
