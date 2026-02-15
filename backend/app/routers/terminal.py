@@ -1,15 +1,14 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 import asyncio
 import logging
-import paramiko
 from ..database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from ..models import Setting
-import io
 import json
 from pydantic import BaseModel
 from typing import Optional
+from ..core.ssh_policy import connect_ssh, map_ssh_error
 
 
 router = APIRouter(
@@ -28,43 +27,39 @@ class SshTestRequest(BaseModel):
     authMethod: str
     password: Optional[str] = None
     privateKey: Optional[str] = None
+    hostFingerprint: Optional[str] = None
 
 
 @router.post("/test-ssh")
-async def test_ssh_connection(req: SshTestRequest):
+async def test_ssh_connection(req: SshTestRequest, db: AsyncSession = Depends(get_db)):
     try:
-        ssh_client = paramiko.SSHClient()
-        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-        target_host = req.host
-        if target_host in ["localhost", "127.0.0.1"]:
-            target_host = "host.docker.internal"
-
-        if req.authMethod == "key" and req.privateKey:
-            key_file = io.StringIO(req.privateKey)
-            try:
-                pkey = paramiko.RSAKey.from_private_key(key_file)
-            except Exception:
-                try:
-                    key_file.seek(0)
-                    pkey = paramiko.Ed25519Key.from_private_key(key_file)
-                except Exception:
-                    key_file.seek(0)
-                    pkey = paramiko.PKey.from_private_key(key_file)
-            ssh_client.connect(target_host, port=req.port, username=req.username, pkey=pkey, timeout=5)
-        else:
-            ssh_client.connect(target_host, port=req.port, username=req.username, password=req.password, timeout=5)
-
+        configured_fingerprint = await get_setting_value(db, "ssh_host_fingerprint")
+        fingerprint = req.hostFingerprint if req.hostFingerprint is not None else configured_fingerprint
+        ssh_client = connect_ssh(
+            host=req.host,
+            port=req.port,
+            username=req.username,
+            auth_method=req.authMethod,
+            password=req.password,
+            private_key=req.privateKey,
+            host_fingerprint=fingerprint,
+            timeout=5,
+        )
         ssh_client.close()
         return {"status": "success", "message": "Successfully connected to host."}
     except Exception as e:
-        return {"status": "error", "message": str(e)}
+        code, message = map_ssh_error(e)
+        return {"status": "error", "code": code, "message": message}
 
 
 async def get_setting_value(db: AsyncSession, key: str, default: str = "") -> str:
     result = await db.execute(select(Setting).where(Setting.key == key))
     setting = result.scalars().first()
     return setting.value if setting else default
+
+
+async def _send_ws_error(websocket: WebSocket, code: str, message: str):
+    await websocket.send_text(json.dumps({"type": "error", "code": code, "message": message}))
 
 
 @router.websocket("/ws")
@@ -77,6 +72,7 @@ async def websocket_terminal(websocket: WebSocket, db: AsyncSession = Depends(ge
     ssh_user = await get_setting_value(db, "ssh_username")
     ssh_auth_method = await get_setting_value(db, "ssh_auth_method", "password")
     ssh_password = await get_setting_value(db, "ssh_password")
+    ssh_host_fingerprint = await get_setting_value(db, "ssh_host_fingerprint")
 
     ssh_client = None
     chan = None
@@ -100,34 +96,32 @@ async def websocket_terminal(websocket: WebSocket, db: AsyncSession = Depends(ge
                 target_host = "host.docker.internal"
 
             try:
-                ssh_client = paramiko.SSHClient()
-                ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-                if ssh_auth_method == "key" and ssh_key:
-                    key_file = io.StringIO(ssh_key)
-                    try:
-                        pkey = paramiko.RSAKey.from_private_key(key_file)
-                    except Exception:
-                        try:
-                            key_file.seek(0)
-                            pkey = paramiko.Ed25519Key.from_private_key(key_file)
-                        except Exception:
-                            key_file.seek(0)
-                            pkey = paramiko.PKey.from_private_key(key_file)
-                    ssh_client.connect(target_host, port=ssh_port, username=ssh_user, pkey=pkey, timeout=10)
-                else:
-                    ssh_client.connect(target_host, port=ssh_port, username=ssh_user, password=ssh_password, timeout=10)
+                ssh_client = connect_ssh(
+                    host=target_host,
+                    port=ssh_port,
+                    username=ssh_user,
+                    auth_method=ssh_auth_method,
+                    password=ssh_password,
+                    private_key=ssh_key,
+                    host_fingerprint=ssh_host_fingerprint,
+                    timeout=10,
+                )
 
                 chan = ssh_client.invoke_shell(term='xterm-256color', width=cols, height=rows)
                 chan.setblocking(0)
                 await websocket.send_text(f"\x1b[32mConnected to host {ssh_host} via SSH\x1b[0m\r\n")
             except Exception as e:
-                logger.error(f"SSH connection failed: {e}")
-                await websocket.send_text(f"\x1b[31mSSH Connection Failed: {e}\x1b[0m\r\n")
+                code, message = map_ssh_error(e)
+                logger.error("SSH connection failed: %s (%s)", message, code)
+                await _send_ws_error(websocket, code, f"SSH Connection Failed: {message}")
                 await websocket.close()
                 return
         else:
-            await websocket.send_text("\x1b[31mError: Host server not configured. Please check terminal settings.\x1b[0m\r\n")
+            await _send_ws_error(
+                websocket,
+                "ssh_host_not_configured",
+                "Error: Host server not configured. Please check terminal settings.",
+            )
             await websocket.close()
             return
 

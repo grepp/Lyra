@@ -12,6 +12,7 @@ class Environment(Base):
     name = Column(String(255), unique=True, nullable=False)
     container_user = Column(String(50), default='root')
     root_password = Column(String(50), nullable=False)
+    root_password_encrypted = Column(Text, nullable=True)
     status = Column(String(50), default='building')  # building, running, stopped, error
     gpu_indices = Column(ARRAY(Integer), nullable=False)
     ssh_port = Column(Integer, unique=True, nullable=False)

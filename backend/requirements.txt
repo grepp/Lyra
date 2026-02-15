@@ -14,3 +14,4 @@ httpx
 ptyprocess
 paramiko
 alembic
+cryptography

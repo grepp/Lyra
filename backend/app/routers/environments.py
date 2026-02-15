@@ -6,6 +6,7 @@ from sqlalchemy import text
 from typing import List
 from ..database import get_db
 from ..models import Environment, Setting
+from ..core.security import SecretCipherError, SecretKeyError, encrypt_secret
 from ..schemas import (
     CustomPortAllocateRequest,
     CustomPortAllocateResponse,
@@ -18,6 +19,7 @@ import docker
 import secrets
 import time
 import random
+import logging
 from sqlalchemy.exc import IntegrityError
 import json
 
@@ -33,6 +35,8 @@ CUSTOM_HOST_PORT_RANGE = (35001, 60000)
 CUSTOM_CONTAINER_PORT_RANGE = (10000, 20000)
 RESERVED_CONTAINER_PORTS = {22, 8080, 8888}
 GPU_ALLOCATION_LOCK_KEY = 93821
+GPU_OCCUPIED_STATUSES = {"creating", "building", "running", "starting"}
+logger = logging.getLogger(__name__)
 
 
 def _is_name_unique_violation(error: IntegrityError) -> bool:
@@ -66,10 +70,12 @@ def _detect_total_gpus() -> int:
 
 
 async def _collect_used_gpu_indices(db: AsyncSession) -> set[int]:
-    result = await db.execute(select(Environment).where(Environment.status.in_(["running", "building"])))
+    result = await db.execute(select(Environment).where(Environment.status.in_(GPU_OCCUPIED_STATUSES)))
     active_envs = result.scalars().all()
     used_indices: set[int] = set()
     for active in active_envs:
+        if active.status not in GPU_OCCUPIED_STATUSES:
+            continue
         if active.gpu_indices:
             used_indices.update(active.gpu_indices)
     return used_indices
@@ -211,11 +217,29 @@ def _validate_custom_ports(custom_ports: list[dict]):
         host_port = mapping["host_port"]
         container_port = mapping["container_port"]
         if host_port in host_ports:
-            raise HTTPException(status_code=400, detail=f"Duplicate host port in custom mappings: {host_port}")
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "duplicate_custom_host_port",
+                    "message": f"Duplicate host port in custom mappings: {host_port}",
+                },
+            )
         if container_port in container_ports:
-            raise HTTPException(status_code=400, detail=f"Duplicate container port in custom mappings: {container_port}")
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "duplicate_custom_container_port",
+                    "message": f"Duplicate container port in custom mappings: {container_port}",
+                },
+            )
         if container_port in RESERVED_CONTAINER_PORTS:
-            raise HTTPException(status_code=400, detail=f"Container port {container_port} is reserved")
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "code": "reserved_container_port",
+                    "message": f"Container port {container_port} is reserved",
+                },
+            )
         host_ports.add(host_port)
         container_ports.add(container_port)
 
@@ -259,7 +283,10 @@ async def allocate_custom_ports(payload: CustomPortAllocateRequest, db: AsyncSes
 @router.post("/", response_model=EnvironmentResponse, status_code=status.HTTP_201_CREATED)
 async def create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(get_db)):
     if not env.dockerfile_content or not env.dockerfile_content.strip():
-        raise HTTPException(status_code=400, detail="Dockerfile content is required")
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "dockerfile_required", "message": "Dockerfile content is required"},
+        )
 
     existing = await db.execute(select(Environment).where(Environment.name == env.name))
     if existing.scalars().first():
@@ -267,6 +294,19 @@ async def create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(
             status_code=409,
             detail={"code": "duplicate_environment_name", "message": "Environment name already exists"},
         )
+
+    try:
+        encrypted_root_password = encrypt_secret(env.root_password)
+    except SecretKeyError as error:
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "security_key_missing", "message": str(error)},
+        ) from error
+    except SecretCipherError as error:
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "password_encryption_failed", "message": str(error)},
+        ) from error
 
     # GPU allocation logic
     gpu_indices: list[int] = []
@@ -294,7 +334,10 @@ async def create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(
         if len(available_indices) < env.gpu_count:
             raise HTTPException(
                 status_code=400,
-                detail=f"Not enough GPUs available. Requested: {env.gpu_count}, Available: {len(available_indices)}",
+                detail={
+                    "code": "gpu_capacity_insufficient",
+                    "message": f"Not enough GPUs available. Requested: {env.gpu_count}, Available: {len(available_indices)}",
+                },
             )
         gpu_indices = available_indices[: env.gpu_count]
 
@@ -305,61 +348,86 @@ async def create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(
         if mapping["host_port"] in blocked_host_ports:
             raise HTTPException(
                 status_code=409,
-                detail=f"Custom host port {mapping['host_port']} is already in use. Please regenerate ports.",
+                detail={
+                    "code": "custom_host_port_conflict",
+                    "message": f"Custom host port {mapping['host_port']} is already in use. Please regenerate ports.",
+                },
             )
 
+    await db.rollback()
+
     new_env = None
+    jupyter_token = secrets.token_urlsafe(32)
     for _ in range(MAX_PORT_ALLOCATION_RETRIES):
-        # Serialize GPU allocation + environment insert to minimize race conditions.
-        await db.execute(text("SELECT pg_advisory_xact_lock(:lock_key)"), {"lock_key": GPU_ALLOCATION_LOCK_KEY})
-
-        if requested_indices:
-            latest_used_indices = await _collect_used_gpu_indices(db)
-            conflicted = sorted(idx for idx in requested_indices if idx in latest_used_indices)
-            if conflicted:
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "code": "gpu_already_allocated",
-                        "message": f"Requested GPUs are already in use: {conflicted}",
-                    },
-                )
-            gpu_indices = sorted(requested_indices)
-        elif env.gpu_count > 0:
-            total_gpus = _detect_total_gpus()
-            latest_used_indices = await _collect_used_gpu_indices(db)
-            available_indices = [i for i in range(total_gpus) if i not in latest_used_indices]
-            if len(available_indices) < env.gpu_count:
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "code": "gpu_already_allocated",
-                        "message": "Not enough GPUs available at creation time",
-                    },
-                )
-            gpu_indices = available_indices[: env.gpu_count]
-
-        ssh_port, jupyter_port, code_port = await _allocate_ports(db)
-        candidate_env = Environment(
-            name=env.name,
-            container_user=env.container_user,
-            root_password=env.root_password,
-            dockerfile_content=env.dockerfile_content,
-            enable_jupyter=env.enable_jupyter,
-            enable_code_server=env.enable_code_server,
-            mount_config=[m.dict() for m in env.mount_config],
-            gpu_indices=gpu_indices,
-            ssh_port=ssh_port,
-            jupyter_port=jupyter_port,
-            code_port=code_port,
-            status="building",
-        )
-
-        db.add(candidate_env)
         try:
-            await db.commit()
-            await db.refresh(candidate_env)
-            new_env = candidate_env
+            async with db.begin():
+                # Serialize GPU allocation + environment insert.
+                await db.execute(
+                    text("SELECT pg_advisory_xact_lock(:lock_key)"),
+                    {"lock_key": GPU_ALLOCATION_LOCK_KEY},
+                )
+
+                if requested_indices:
+                    latest_used_indices = await _collect_used_gpu_indices(db)
+                    conflicted = sorted(idx for idx in requested_indices if idx in latest_used_indices)
+                    if conflicted:
+                        raise HTTPException(
+                            status_code=409,
+                            detail={
+                                "code": "gpu_already_allocated",
+                                "message": f"Requested GPUs are already in use: {conflicted}",
+                            },
+                        )
+                    gpu_indices = sorted(requested_indices)
+                elif env.gpu_count > 0:
+                    total_gpus = _detect_total_gpus()
+                    latest_used_indices = await _collect_used_gpu_indices(db)
+                    available_indices = [i for i in range(total_gpus) if i not in latest_used_indices]
+                    if len(available_indices) < env.gpu_count:
+                        raise HTTPException(
+                            status_code=409,
+                            detail={
+                                "code": "gpu_already_allocated",
+                                "message": "Not enough GPUs available at creation time",
+                            },
+                        )
+                    gpu_indices = available_indices[: env.gpu_count]
+
+                try:
+                    ssh_port, jupyter_port, code_port = await _allocate_ports(db)
+                except HTTPException as port_error:
+                    if port_error.status_code == 503:
+                        raise HTTPException(
+                            status_code=503,
+                            detail={
+                                "code": "port_allocation_failed",
+                                "message": "Failed to allocate unique ports. Please try again.",
+                            },
+                        ) from port_error
+                    raise
+
+                candidate_env = Environment(
+                    name=env.name,
+                    container_user=env.container_user,
+                    root_password="__redacted__",
+                    root_password_encrypted=encrypted_root_password,
+                    dockerfile_content=env.dockerfile_content,
+                    enable_jupyter=env.enable_jupyter,
+                    enable_code_server=env.enable_code_server,
+                    mount_config=[m.dict() for m in env.mount_config],
+                    gpu_indices=gpu_indices,
+                    ssh_port=ssh_port,
+                    jupyter_port=jupyter_port,
+                    code_port=code_port,
+                    status="creating",
+                )
+                db.add(candidate_env)
+                await db.flush()
+
+                db.add(Setting(key=f"jupyter_token:{candidate_env.id}", value=jupyter_token))
+                db.add(Setting(key=f"custom_ports:{candidate_env.id}", value=json.dumps(custom_ports)))
+                new_env = candidate_env
+
             break
         except IntegrityError as error:
             await db.rollback()
@@ -372,20 +440,114 @@ async def create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(
     if new_env is None:
         raise HTTPException(
             status_code=503,
-            detail="Failed to allocate unique ports after several retries. Please try again.",
+            detail={
+                "code": "port_allocation_failed",
+                "message": "Failed to allocate unique ports after several retries. Please try again.",
+            },
         )
 
-    jupyter_token = secrets.token_urlsafe(32)
-    db.add(Setting(key=f"jupyter_token:{new_env.id}", value=jupyter_token))
-    db.add(Setting(key=f"custom_ports:{new_env.id}", value=json.dumps(custom_ports)))
-    await db.commit()
+    try:
+        create_environment_task.delay(str(new_env.id))
+    except Exception as enqueue_error:
+        compensation_done = False
+        try:
+            async with db.begin():
+                rollback_env = await db.execute(select(Environment).where(Environment.id == new_env.id))
+                env_to_remove = rollback_env.scalars().first()
+                if env_to_remove:
+                    token_result = await db.execute(
+                        select(Setting).where(Setting.key == f"jupyter_token:{new_env.id}")
+                    )
+                    token_setting = token_result.scalars().first()
+                    if token_setting:
+                        await db.delete(token_setting)
 
-    # Trigger Celery Task
-    create_environment_task.delay(new_env.id)
+                    custom_ports_result = await db.execute(
+                        select(Setting).where(Setting.key == f"custom_ports:{new_env.id}")
+                    )
+                    custom_ports_setting = custom_ports_result.scalars().first()
+                    if custom_ports_setting:
+                        await db.delete(custom_ports_setting)
+
+                    await db.delete(env_to_remove)
+                compensation_done = True
+        except Exception:
+            await db.rollback()
+
+        if not compensation_done:
+            try:
+                async with db.begin():
+                    failed_env_result = await db.execute(select(Environment).where(Environment.id == new_env.id))
+                    failed_env = failed_env_result.scalars().first()
+                    if failed_env:
+                        failed_env.status = "error"
+            except Exception:
+                await db.rollback()
+
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "code": "task_enqueue_failed",
+                "message": "Failed to enqueue provisioning task. Please try again.",
+            },
+        ) from enqueue_error
+
+    async with db.begin():
+        refreshed = await db.execute(select(Environment).where(Environment.id == new_env.id))
+        created_env = refreshed.scalars().first()
+        if created_env:
+            created_env.status = "building"
+            new_env = created_env
 
     env_dict = {**new_env.__dict__, "custom_ports": custom_ports}
     env_dict.pop("_sa_instance_state", None)
     return env_dict
+
+
+def _resolve_environment_status(
+    current_status: str,
+    container_status: str,
+    state_status: str,
+    exit_code,
+    oom_killed: bool,
+    error_msg: str,
+) -> str:
+    if container_status == "running":
+        if current_status == "starting":
+            return "running"
+        if current_status == "stopping":
+            return "stopping"
+        if current_status != "running":
+            return "running"
+        return current_status
+
+    if current_status == "stopping":
+        if state_status in ["created", "restarting", "starting"]:
+            return "stopping"
+        return "stopped"
+
+    if current_status == "starting":
+        if state_status in ["created", "restarting", "starting"] and exit_code is None:
+            return "starting"
+        if exit_code is None:
+            return "stopped"
+        if exit_code in [0, 143]:
+            return "stopped"
+        if exit_code == 137:
+            if oom_killed or str(error_msg).strip():
+                return "error"
+            return "stopped"
+        return "error"
+
+    if exit_code is None:
+        return "stopped"
+    if exit_code in [0, 143]:
+        return "stopped"
+    if exit_code == 137:
+        if oom_killed or str(error_msg).strip():
+            return "error"
+        return "stopped"
+    return "error"
 
 
 @router.get("/", response_model=List[EnvironmentResponse])
@@ -394,7 +556,17 @@ async def read_environments(skip: int = 0, limit: int = 100, db: AsyncSession = 
     envs = result.scalars().all()
     custom_ports_map = await _get_custom_ports_map(db)
 
-    client = docker.from_env()
+    client = None
+    docker_available = True
+    try:
+        client = docker.from_env()
+    except docker.errors.DockerException as error:
+        docker_available = False
+        logger.warning("Docker daemon unavailable while reading environments: %s", error)
+    except Exception as error:
+        docker_available = False
+        logger.warning("Unexpected Docker client initialization failure: %s", error)
+
     status_changed = False
     env_responses = []
 
@@ -402,69 +574,38 @@ async def read_environments(skip: int = 0, limit: int = 100, db: AsyncSession = 
         container_name = f"lyra-{env.name}-{env.id}"
         container_id: str | None = None
 
-        try:
-            container = client.containers.get(container_name)
-            container_id = container.short_id or (container.id[:12] if container.id else None)
-            state_info = container.attrs.get('State', {})
-            container_status = container.status
-            state_status = state_info.get('Status', '')
-            exit_code = state_info.get('ExitCode')
-            oom_killed = state_info.get('OOMKilled', False)
-            error_msg = state_info.get('Error', "")
-
-            if container_status == 'running':
-                if env.status == 'starting':
-                    new_status = 'running'
-                elif env.status == 'stopping':
-                    new_status = 'stopping'
-                elif env.status != 'running':
-                    new_status = 'running'
-                else:
-                    new_status = env.status
-            else:
-                if env.status == 'stopping':
-                    if state_status in ['created', 'restarting', 'starting']:
-                        new_status = 'stopping'
-                    else:
-                        # User-initiated stop may end with non-zero exit codes (e.g. SIGKILL/137).
-                        # While we're in stopping state, treat any finished container as stopped.
-                        new_status = 'stopped'
-                elif env.status == 'starting':
-                    if state_status in ['created', 'restarting', 'starting'] and exit_code is None:
-                        new_status = 'starting'
-                    elif exit_code is None:
-                        new_status = 'stopped'
-                    elif exit_code in [0, 143]:
-                        new_status = 'stopped'
-                    elif exit_code == 137:
-                        if oom_killed or str(error_msg).strip():
-                            new_status = 'error'
-                        else:
-                            new_status = 'stopped'
-                    else:
-                        new_status = 'error'
-                else:
-                    if exit_code is None:
-                        new_status = 'stopped'
-                    elif exit_code in [0, 143]:
-                        new_status = 'stopped'
-                    elif exit_code == 137:
-                        if oom_killed or str(error_msg).strip():
-                            new_status = 'error'
-                        else:
-                            new_status = 'stopped'
-                    else:
-                        new_status = 'error'
-
-            if env.status != new_status:
-                env.status = new_status
-                status_changed = True
-        except docker.errors.NotFound:
-            if env.status in ['running', 'stopping', 'starting']:
-                env.status = 'stopped'
-                status_changed = True
-        except Exception as e:
-            print(f"Error checking container status: {e}")
+        if docker_available and client is not None:
+            try:
+                container = client.containers.get(container_name)
+                container_id = container.short_id or (container.id[:12] if container.id else None)
+                state_info = container.attrs.get("State", {})
+                new_status = _resolve_environment_status(
+                    current_status=env.status,
+                    container_status=container.status,
+                    state_status=state_info.get("Status", ""),
+                    exit_code=state_info.get("ExitCode"),
+                    oom_killed=state_info.get("OOMKilled", False),
+                    error_msg=state_info.get("Error", ""),
+                )
+                if env.status != new_status:
+                    env.status = new_status
+                    status_changed = True
+            except docker.errors.NotFound:
+                if env.status in ["running", "stopping", "starting"]:
+                    env.status = "stopped"
+                    status_changed = True
+            except docker.errors.DockerException as error:
+                logger.warning(
+                    "Docker status lookup failed for env %s. Falling back to DB status: %s",
+                    env.id,
+                    error,
+                )
+            except Exception as error:
+                logger.warning(
+                    "Unexpected status resolution failure for env %s. Falling back to DB status: %s",
+                    env.id,
+                    error,
+                )
 
         env_dict = {
             **env.__dict__,
@@ -474,7 +615,7 @@ async def read_environments(skip: int = 0, limit: int = 100, db: AsyncSession = 
         env_dict.pop("_sa_instance_state", None)
         env_responses.append(env_dict)
 
-    if status_changed:
+    if status_changed and docker_available:
         await db.commit()
 
     return env_responses

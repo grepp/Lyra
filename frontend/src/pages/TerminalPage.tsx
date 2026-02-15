@@ -137,7 +137,17 @@ export default function TerminalPage() {
 
     ws.onmessage = (event) => {
         if (typeof event.data === 'string') {
-             term.write(event.data);
+            try {
+              const payload = JSON.parse(event.data) as { type?: string; code?: string; message?: string };
+              if (payload?.type === 'error') {
+                const msg = payload.message || payload.code || 'Terminal connection error';
+                term.write(`\r\n\x1b[31m${msg}\x1b[0m\r\n`);
+                return;
+              }
+            } catch {
+              // Fallback to legacy plain-text frame.
+            }
+            term.write(event.data);
         } else {
             const reader = new FileReader();
             reader.onload = () => {

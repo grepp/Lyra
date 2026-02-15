@@ -20,16 +20,32 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "environments",
-        sa.Column("enable_jupyter", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-    )
-    op.add_column(
-        "environments",
-        sa.Column("enable_code_server", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-    )
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if not inspector.has_table("environments"):
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("environments")}
+    if "enable_jupyter" not in columns:
+        op.add_column(
+            "environments",
+            sa.Column("enable_jupyter", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        )
+    if "enable_code_server" not in columns:
+        op.add_column(
+            "environments",
+            sa.Column("enable_code_server", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        )
 
 
 def downgrade() -> None:
-    op.drop_column("environments", "enable_code_server")
-    op.drop_column("environments", "enable_jupyter")
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    if not inspector.has_table("environments"):
+        return
+
+    columns = {col["name"] for col in inspector.get_columns("environments")}
+    if "enable_code_server" in columns:
+        op.drop_column("environments", "enable_code_server")
+    if "enable_jupyter" in columns:
+        op.drop_column("environments", "enable_jupyter")

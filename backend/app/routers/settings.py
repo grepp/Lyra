@@ -5,6 +5,11 @@ from ..database import get_db
 from ..models import Setting
 from ..schemas import SettingResponse, SettingUpdate
 from typing import List
+from ..core.settings_policy import (
+    is_allowed_setting_key,
+    validate_setting_key_for_read,
+    validate_setting_key_for_write,
+)
 
 router = APIRouter(
     prefix="/settings",
@@ -15,11 +20,14 @@ router = APIRouter(
 @router.get("/", response_model=List[SettingResponse])
 async def get_settings(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Setting))
-    return result.scalars().all()
+    settings = result.scalars().all()
+    return [setting for setting in settings if is_allowed_setting_key(setting.key)]
 
 
 @router.get("/{key}", response_model=SettingResponse)
 async def get_setting(key: str, db: AsyncSession = Depends(get_db)):
+    validate_setting_key_for_read(key)
+
     result = await db.execute(select(Setting).where(Setting.key == key))
     setting = result.scalars().first()
 
@@ -32,6 +40,8 @@ async def get_setting(key: str, db: AsyncSession = Depends(get_db)):
 
 @router.put("/{key}", response_model=SettingResponse)
 async def update_setting(key: str, setting_update: SettingUpdate, db: AsyncSession = Depends(get_db)):
+    validate_setting_key_for_write(key)
+
     result = await db.execute(select(Setting).where(Setting.key == key))
     setting = result.scalars().first()
 

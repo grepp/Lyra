@@ -21,6 +21,15 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    if not inspector.has_table("environments"):
+        return
+
+    unique_constraints = inspector.get_unique_constraints("environments")
+    unique_names = {uc.get("name") for uc in unique_constraints if uc.get("name")}
+    if "uq_environments_name" in unique_names:
+        return
+
     conn.execute(
         sa.text(
             """
@@ -39,4 +48,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    if not inspector.has_table("environments"):
+        return
+
+    unique_constraints = inspector.get_unique_constraints("environments")
+    unique_names = {uc.get("name") for uc in unique_constraints if uc.get("name")}
+    if "uq_environments_name" not in unique_names:
+        return
+
     op.drop_constraint("uq_environments_name", "environments", type_="unique")

@@ -255,7 +255,14 @@ export default function Dashboard() {
             </div>
           </div>
         ) : (
-          <span className="text-[var(--text-muted)]">-</span>
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            className="p-1 rounded text-[var(--border)] opacity-70 cursor-not-allowed"
+          >
+            <LayoutTemplate size={14} />
+          </button>
         ),
       },
       {
@@ -274,7 +281,14 @@ export default function Dashboard() {
             </div>
           </div>
         ) : (
-          <span className="text-[var(--text-muted)]">-</span>
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            className="p-1 rounded text-[var(--border)] opacity-70 cursor-not-allowed"
+          >
+            <Code2 size={14} />
+          </button>
         ),
       },
     ];
@@ -283,7 +297,7 @@ export default function Dashboard() {
       <div className="flex items-center gap-2">
         {accessItems.map((item, index) => (
           <div key={item.key} className="flex items-center gap-2">
-            {index > 0 && <span className="text-[var(--text-muted)]">/</span>}
+            {index > 0 && <span className="w-1" aria-hidden="true" />}
             {item.node}
           </div>
         ))}
@@ -490,13 +504,13 @@ export default function Dashboard() {
                 <RefreshCw size={18} className={loading && hasLoadedOnce ? "animate-spin" : ""} />
             </button>
         </div>
-        <div className="w-full text-left">
+        <div className="w-full overflow-x-auto text-left">
             {!hasLoadedOnce && loading ? (
                  <div className="p-6 text-center text-[var(--text-muted)]">{t('messages.loadingEnvironments')}</div>
             ) : environments.length === 0 ? (
                  <div className="p-6 text-center text-[var(--text-muted)]">{t('messages.noEnvironments')}</div>
             ) : (
-                <table className="w-full">
+                <table className="w-full min-w-[980px]">
                     <thead className="bg-[var(--bg-soft)] text-[var(--text-muted)] text-sm uppercase">
                         <tr>
                             <th className="px-6 py-4 font-medium">{t('labels.name')}</th>
@@ -526,6 +540,7 @@ export default function Dashboard() {
                                                 : 'bg-gray-500/10 text-gray-400')
                                               : env.status === 'running' ? 'bg-green-500/10 text-green-500' :
                                                 env.status === 'stopped' ? 'bg-yellow-500/10 text-yellow-500' :
+                                                env.status === 'creating' ? 'bg-blue-500/10 text-blue-500' :
                                                 env.status === 'building' ? 'bg-blue-500/10 text-blue-500' :
                                                 env.status === 'starting' ? 'bg-gray-500/10 text-gray-400' :
                                                 env.status === 'stopping' ? 'bg-gray-500/10 text-gray-400' :
@@ -550,11 +565,36 @@ export default function Dashboard() {
                                     {renderAccessCell(env)}
                                 </td>
                                 <td className="px-6 py-4 text-[var(--text)]">
-                                    {env.gpu_indices.length > 0 ? env.gpu_indices.join(', ') : "-"}
+                                    {env.gpu_indices.length > 0 ? (
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        {env.gpu_indices.slice(0, 3).map((gpuIndex) => (
+                                          <span
+                                            key={`${env.id}-gpu-${gpuIndex}`}
+                                            className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-500/10 text-gray-400"
+                                          >
+                                            {gpuIndex}
+                                          </span>
+                                        ))}
+                                        {env.gpu_indices.length > 3 && (
+                                          <div className="relative group">
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-500/10 text-gray-400">
+                                              +{env.gpu_indices.length - 3}
+                                            </span>
+                                            <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-[var(--text)] opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
+                                              {env.gpu_indices.join(' ')}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : "-"}
                                 </td>
                                 <td className="px-6 py-4 text-right space-x-2">
                                     {(() => {
-                                        const isTransitioning = env.status === 'stopping' || env.status === 'starting';
+                                        const isTransitioning =
+                                          env.status === 'stopping' ||
+                                          env.status === 'starting' ||
+                                          env.status === 'creating' ||
+                                          env.status === 'building';
                                         const isRunning = env.status === 'running';
                                         return (
                                             <button

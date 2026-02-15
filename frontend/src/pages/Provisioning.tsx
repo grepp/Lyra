@@ -20,10 +20,18 @@ interface CustomPortMapping {
   container_port: number;
 }
 
+interface EnvironmentSummary {
+  name?: string;
+  status?: string;
+  gpu_indices?: number[];
+}
+
 const MANAGED_JUPYTER_START = '# >>> LYRA_MANAGED_JUPYTER_START';
 const MANAGED_JUPYTER_END = '# <<< LYRA_MANAGED_JUPYTER_END';
 const MANAGED_CODE_START = '# >>> LYRA_MANAGED_CODE_SERVER_START';
 const MANAGED_CODE_END = '# <<< LYRA_MANAGED_CODE_SERVER_END';
+const MANAGED_SSH_START = '# >>> LYRA_MANAGED_SSH_START';
+const MANAGED_SSH_END = '# <<< LYRA_MANAGED_SSH_END';
 
 const normalizeDockerfile = (text: string): string => {
   const normalized = text
@@ -37,6 +45,7 @@ const stripManagedBlocks = (text: string): string => {
   if (!text) return '';
   let next = text;
   const patterns = [
+    new RegExp(`${MANAGED_SSH_START}[\\s\\S]*?${MANAGED_SSH_END}\\n?`, 'g'),
     new RegExp(`${MANAGED_JUPYTER_START}[\\s\\S]*?${MANAGED_JUPYTER_END}\\n?`, 'g'),
     new RegExp(`${MANAGED_CODE_START}[\\s\\S]*?${MANAGED_CODE_END}\\n?`, 'g'),
   ];
@@ -47,7 +56,24 @@ const stripManagedBlocks = (text: string): string => {
 };
 
 const buildManagedBlocks = (enableJupyter: boolean, enableCodeServer: boolean): string => {
-  const blocks: string[] = [];
+  const blocks: string[] = [
+    `${MANAGED_SSH_START}`,
+    '# Managed by Lyra provisioning runtime requirements',
+    'RUN if ! command -v sshd >/dev/null 2>&1 && [ ! -x /usr/sbin/sshd ]; then \\',
+    '      (command -v apt-get >/dev/null 2>&1 && apt-get update && apt-get install -y --no-install-recommends openssh-server passwd) || \\',
+    '      (command -v apk >/dev/null 2>&1 && apk add --no-cache openssh shadow) || \\',
+    '      (command -v dnf >/dev/null 2>&1 && dnf install -y openssh-server shadow-utils) || \\',
+    '      (command -v yum >/dev/null 2>&1 && yum install -y openssh-server shadow-utils); \\',
+    '    fi && \\',
+    '    if ! command -v chpasswd >/dev/null 2>&1; then \\',
+    '      (command -v apt-get >/dev/null 2>&1 && apt-get update && apt-get install -y --no-install-recommends passwd) || \\',
+    '      (command -v apk >/dev/null 2>&1 && apk add --no-cache shadow) || \\',
+    '      (command -v dnf >/dev/null 2>&1 && dnf install -y shadow-utils) || \\',
+    '      (command -v yum >/dev/null 2>&1 && yum install -y shadow-utils); \\',
+    '    fi && \\',
+    '    mkdir -p /var/run/sshd /etc/ssh',
+    `${MANAGED_SSH_END}`,
+  ];
   if (enableJupyter) {
     blocks.push(
       `${MANAGED_JUPYTER_START}`,
@@ -103,23 +129,6 @@ export default function Provisioning() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Modal State
-  const [modalConfig, setModalConfig] = useState({
-      isOpen: false,
-      title: '',
-      message: '',
-      type: 'alert' as 'alert' | 'confirm'
-  });
-
-  const showAlert = (title: string, message: string) => {
-      setModalConfig({
-          isOpen: true,
-          title,
-          message,
-          type: 'alert'
-      });
-  };
-
   const [selectedGpuIndices, setSelectedGpuIndices] = useState<number[]>([]);
   const [availableGpuIndices, setAvailableGpuIndices] = useState<number[]>([]);
   const [totalGpus, setTotalGpus] = useState(0);
@@ -134,38 +143,36 @@ export default function Provisioning() {
 
   // Fetch GPU Resources and Load Template
   useEffect(() => {
-    // 1. Fetch GPU Info
     axios.get('resources/gpu')
-      .then(res => {
-         const total = Number(res.data?.total || 0);
-         const used = Number(res.data?.used || 0);
-         const availableIndices = Array.isArray(res.data?.available_indices)
-           ? res.data.available_indices.map((idx: number) => Number(idx)).filter((idx: number) => Number.isInteger(idx) && idx >= 0)
-           : [];
-         setTotalGpus(total);
-         setUsedGpuCount(used);
-         setAvailableGpuIndices(availableIndices);
-         setSelectedGpuIndices((prev) => prev.filter((idx) => availableIndices.includes(idx)));
-
-         // 2. Load Template if exists
-         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-         const state = location.state as { templateConfig?: any };
-         if (state && state.templateConfig) {
-             const config = state.templateConfig;
-
-             // Only load Dockerfile content
-             if (config.dockerfile_content) {
-               setUserDockerfile(normalizeDockerfile(stripManagedBlocks(config.dockerfile_content)));
-               setErrors((prev) => ({ ...prev, dockerfile: undefined }));
-             }
-
-             // Clear state so refresh doesn't reload template
-             window.history.replaceState({}, document.title);
-
-             // Show a toast or notification? (Optional)
-         }
+      .then((gpuRes) => {
+        const total = Number(gpuRes.data?.total || 0);
+        const used = Number(gpuRes.data?.used || 0);
+        const availableIndices = Array.isArray(gpuRes.data?.available_indices)
+          ? gpuRes.data.available_indices.map((idx: number) => Number(idx)).filter((idx: number) => Number.isInteger(idx) && idx >= 0)
+          : [];
+        setTotalGpus(total);
+        setUsedGpuCount(used);
+        setAvailableGpuIndices(availableIndices);
+        setSelectedGpuIndices((prev) => prev.filter((idx) => availableIndices.includes(idx)));
       })
       .catch(err => console.error("Failed to fetch GPU resources", err));
+
+    // 2. Load Template if exists
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const state = location.state as { templateConfig?: any };
+    if (state && state.templateConfig) {
+      const config = state.templateConfig;
+
+      // Only load Dockerfile content
+      if (config.dockerfile_content) {
+        setUserDockerfile(normalizeDockerfile(stripManagedBlocks(config.dockerfile_content)));
+        setErrors((prev) => ({ ...prev, dockerfile: undefined }));
+      }
+
+      // Clear state so refresh doesn't reload template
+      window.history.replaceState({}, document.title);
+    }
+
   }, [location.state]);
 
   const handleAddGpuSelection = () => {
@@ -232,9 +239,52 @@ export default function Provisioning() {
     () => normalizeDockerfile(buildManagedBlocks(enableJupyter, enableCodeServer)),
     [enableJupyter, enableCodeServer]
   );
-
   // Error State
   const [errors, setErrors] = useState<{name?: string, password?: string, dockerfile?: string}>({});
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: 'alert' | 'confirm';
+    onConfirm?: (() => void) | null;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'alert',
+    onConfirm: null,
+  });
+
+  const showAlert = (title: string, message: string) => {
+    setModalConfig({
+      isOpen: true,
+      title,
+      message,
+      type: 'alert',
+      onConfirm: null,
+    });
+  };
+
+  const submitEnvironment = async () => {
+    const validMounts = mounts.filter(m => m.host_path.trim() !== '' && m.container_path.trim() !== '');
+
+    const payload = {
+      name,
+      container_user: 'root',
+      root_password: password,
+      mount_config: validMounts,
+      custom_ports: customPorts,
+      dockerfile_content: renderedDockerfile,
+      enable_jupyter: enableJupyter,
+      enable_code_server: enableCodeServer,
+      gpu_count: selectedGpuIndices.length,
+      selected_gpu_indices: selectedGpuIndices,
+    };
+
+    // Relative path works thanks to Nginx proxy
+    await axios.post('environments/', payload);
+    navigate('/');
+  };
 
   const handleSubmit = async () => {
     const newErrors: {name?: string, password?: string, dockerfile?: string} = {};
@@ -255,42 +305,93 @@ export default function Provisioning() {
     setErrors({});
 
     try {
-      const validMounts = mounts.filter(m => m.host_path.trim() !== '' && m.container_path.trim() !== '');
+      const envRes = await axios.get('environments/');
+      const envs: EnvironmentSummary[] = Array.isArray(envRes.data) ? envRes.data : [];
+      const selectedSet = new Set(selectedGpuIndices);
+      const stoppedConflicts = envs
+        .filter((env) => env?.status === 'stopped' && Array.isArray(env.gpu_indices) && env.gpu_indices.length > 0)
+        .map((env) => {
+          const overlap = (env.gpu_indices || [])
+            .map((idx) => Number(idx))
+            .filter((idx) => Number.isInteger(idx) && selectedSet.has(idx))
+            .sort((a, b) => a - b);
+          return {
+            name: env.name || 'unknown',
+            overlap,
+          };
+        })
+        .filter((item) => item.overlap.length > 0);
 
-      const payload = {
-        name,
-        container_user: 'root',
-        root_password: password,
-        mount_config: validMounts,
-        custom_ports: customPorts,
-        dockerfile_content: renderedDockerfile,
-        enable_jupyter: enableJupyter,
-        enable_code_server: enableCodeServer,
-        gpu_count: selectedGpuIndices.length,
-        selected_gpu_indices: selectedGpuIndices,
-      };
+      if (stoppedConflicts.length > 0) {
+        const conflictMessage = stoppedConflicts
+          .map((item) => t('provisioning.gpuStoppedConflictLine', { name: item.name, indices: item.overlap.join(', ') }))
+          .join('\n');
+        setModalConfig({
+          isOpen: true,
+          title: t('provisioning.gpuStoppedConfirmTitle'),
+          message: `${conflictMessage}\n\n${t('provisioning.gpuStoppedConfirmMessage')}`,
+          type: 'confirm',
+          onConfirm: () => {
+            void submitEnvironment();
+          },
+        });
+        return;
+      }
 
-      // Relative path works thanks to Nginx proxy
-      await axios.post('environments/', payload);
-
-      navigate('/');
+      await submitEnvironment();
     } catch (error) {
       console.error("Failed to create environment", error);
-      if (axios.isAxiosError(error) && error.response?.status === 409) {
+      if (axios.isAxiosError(error)) {
         const detail = error.response?.data?.detail;
-        if (detail?.code === 'duplicate_environment_name') {
+        const code = typeof detail === 'object' && detail ? String(detail.code || '') : '';
+        const message = typeof detail === 'object' && detail ? String(detail.message || '') : '';
+
+        if (code === 'duplicate_environment_name') {
           setErrors((prev) => ({ ...prev, name: t('provisioning.errorEnvironmentNameDuplicate') }));
           return;
         }
-        if (detail?.code === 'gpu_already_allocated') {
+        if (code === 'dockerfile_required') {
+          setErrors((prev) => ({ ...prev, dockerfile: t('provisioning.errorDockerfileRequired') }));
+          return;
+        }
+        if (code === 'gpu_already_allocated' || code === 'gpu_capacity_insufficient') {
           showToast(t('feedback.provisioning.allocateGpuFailed'), 'error');
           return;
         }
-      }
-      if (axios.isAxiosError(error) && error.response?.status === 400) {
-        const detail = error.response?.data?.detail;
-        if (detail?.code === 'invalid_gpu_selection') {
+        if (code === 'invalid_gpu_selection') {
           showToast(detail?.message || t('feedback.provisioning.invalidGpuSelection'), 'error');
+          return;
+        }
+        if (code === 'custom_host_port_conflict') {
+          showToast(message || t('feedback.provisioning.allocateCustomPortFailed'), 'error');
+          return;
+        }
+        if (
+          code === 'duplicate_custom_host_port' ||
+          code === 'duplicate_custom_container_port' ||
+          code === 'reserved_container_port'
+        ) {
+          showToast(message || t('feedback.provisioning.allocateCustomPortFailed'), 'error');
+          return;
+        }
+        if (code === 'port_allocation_failed') {
+          showAlert(t('feedback.provisioning.creationFailedTitle'), t('feedback.provisioning.portAllocationFailed'));
+          return;
+        }
+        if (code === 'task_enqueue_failed') {
+          showAlert(t('feedback.provisioning.creationFailedTitle'), t('feedback.provisioning.taskEnqueueFailed'));
+          return;
+        }
+        if (code === 'security_key_missing') {
+          showAlert(t('feedback.provisioning.creationFailedTitle'), t('feedback.provisioning.securityKeyMissing'));
+          return;
+        }
+        if (code === 'password_encryption_failed') {
+          showAlert(t('feedback.provisioning.creationFailedTitle'), t('feedback.provisioning.passwordEncryptionFailed'));
+          return;
+        }
+        if (code === 'password_decryption_failed') {
+          showAlert(t('feedback.provisioning.creationFailedTitle'), t('feedback.provisioning.passwordDecryptionFailed'));
           return;
         }
       }
@@ -370,7 +471,8 @@ export default function Provisioning() {
     <div className="p-6 max-w-7xl mx-auto space-y-6 pb-16 relative">
       <Modal
           isOpen={modalConfig.isOpen}
-          onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false }))}
+          onClose={() => setModalConfig(prev => ({ ...prev, isOpen: false, onConfirm: null }))}
+          onConfirm={modalConfig.onConfirm ?? undefined}
           title={modalConfig.title}
           message={modalConfig.message}
           type={modalConfig.type}

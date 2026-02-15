@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base
 from .routers import environments, terminal, resources, settings, templates
 from .models import Setting
+from .core.security import require_secret_key
 from sqlalchemy.future import select
 from contextlib import asynccontextmanager
 import os
@@ -10,6 +11,8 @@ import os
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    require_secret_key()
+
     # Startup
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

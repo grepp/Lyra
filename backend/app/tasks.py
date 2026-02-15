@@ -3,12 +3,14 @@ from .database import DATABASE_URL
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from .models import Environment, Setting
+from .core.security import SecretCipherError, SecretKeyError, decrypt_secret
 import docker
 import tempfile
 import os
 import secrets
 import random
 import json
+from typing import Optional
 
 
 # Sync database setup for Celery
@@ -47,43 +49,113 @@ def _build_ports_config(env, custom_ports: list[dict]) -> dict:
     return ports_config
 
 
-def _build_runtime_command(env) -> str:
-    enable_jupyter = _is_enabled(getattr(env, "enable_jupyter", True))
-    enable_code_server = _is_enabled(getattr(env, "enable_code_server", True))
+def _run_image_probe(client, image_name: str, probe_command: str) -> tuple[bool, str]:
+    try:
+        client.containers.run(
+            image_name,
+            [probe_command],
+            entrypoint=["sh", "-lc"],
+            remove=True,
+            stdout=True,
+            stderr=True,
+            detach=False,
+        )
+        return True, ""
+    except docker.errors.ContainerError as error:
+        stderr = ""
+        if error.stderr:
+            try:
+                stderr = error.stderr.decode("utf-8", errors="ignore")
+            except Exception:
+                stderr = str(error.stderr)
+        return False, stderr.strip() or str(error)
+    except Exception as error:
+        return False, str(error)
 
+
+def _validate_runtime_prerequisites(
+    client,
+    image_name: str,
+    enable_jupyter: bool,
+    enable_code_server: bool,
+) -> Optional[str]:
+    ok, detail = _run_image_probe(
+        client,
+        image_name,
+        "if command -v sshd >/dev/null 2>&1; then :; elif [ -x /usr/sbin/sshd ]; then :; else exit 1; fi; command -v chpasswd >/dev/null 2>&1",  # noqa: E501
+    )
+    if not ok:
+        ok_sshd, _ = _run_image_probe(
+            client,
+            image_name,
+            "command -v sshd >/dev/null 2>&1 || [ -x /usr/sbin/sshd ]",
+        )
+        if not ok_sshd:
+            suffix = f" ({detail})" if detail else ""
+            return f"missing_prerequisite:sshd sshd binary must exist in the image{suffix}"
+        suffix = f" ({detail})" if detail else ""
+        return f"missing_prerequisite:chpasswd chpasswd must exist to apply root password{suffix}"
+
+    if enable_code_server:
+        ok, detail = _run_image_probe(client, image_name, "command -v code-server >/dev/null 2>&1")
+        if not ok:
+            suffix = f" ({detail})" if detail else ""
+            return f"missing_prerequisite:code_server code-server is enabled but code-server binary is missing{suffix}"
+
+    if not enable_jupyter:
+        return None
+
+    ok, _ = _run_image_probe(client, image_name, "command -v jupyter >/dev/null 2>&1")
+    if ok:
+        return "jupyter"
+
+    ok, detail = _run_image_probe(
+        client,
+        image_name,
+        "command -v python3 >/dev/null 2>&1 && python3 -m jupyter --version >/dev/null 2>&1",
+    )
+    if ok:
+        return "python_module"
+
+    suffix = f" ({detail})" if detail else ""
+    return (
+        "missing_prerequisite:jupyter "
+        "jupyter is enabled but neither 'jupyter' nor 'python3 -m jupyter' is available"
+        f"{suffix}"
+    )
+
+
+def _build_runtime_command(jupyter_mode: Optional[str], enable_jupyter: bool, enable_code_server: bool) -> str:
     script_parts = [
         "set -euo pipefail",
-        "export DEBIAN_FRONTEND=noninteractive",
-        "dpkg --configure -a || true",
-        "apt-get update",
-        "apt-get install -y --no-install-recommends openssh-server",
         "mkdir -p /var/run/sshd",
-        f"echo 'root:{env.root_password}' | chpasswd",
+        "mkdir -p /etc/ssh",
+        "[ -f /etc/ssh/sshd_config ] || touch /etc/ssh/sshd_config",
+        'echo "root:${ROOT_PASSWORD}" | chpasswd',
+        "unset ROOT_PASSWORD",
         "grep -q '^PermitRootLogin yes' /etc/ssh/sshd_config || echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config",
-        "/usr/sbin/sshd",
+        'SSHD_BIN="$(command -v sshd || true)"',
+        'if [ -z "$SSHD_BIN" ] && [ -x /usr/sbin/sshd ]; then SSHD_BIN="/usr/sbin/sshd"; fi',
+        'if [ -z "$SSHD_BIN" ]; then echo "sshd binary not found" >&2; exit 1; fi',
+        '"$SSHD_BIN"',
     ]
 
     if enable_code_server:
         script_parts.extend(
             [
-                "if ! command -v code-server >/dev/null 2>&1; then",
-                "  echo 'code-server enabled but binary not found in image; include managed block or install manually' >&2",
-                "  exit 1",
-                "fi",
                 "code-server --bind-addr 0.0.0.0:8080 --auth none /root >/tmp/code-server.log 2>&1 &",
             ]
         )
 
     if enable_jupyter:
-        script_parts.extend(
-            [
-                "if ! command -v jupyter >/dev/null 2>&1; then",
-                "  echo 'jupyter enabled but jupyterlab not found in image; include managed block or install manually' >&2",
-                "  exit 1",
-                "fi",
-                'exec jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --ServerApp.token="$JUPYTER_TOKEN" --NotebookApp.token="$JUPYTER_TOKEN"',  # noqa: E501
-            ]
-        )
+        if jupyter_mode == "python_module":
+            script_parts.append(
+                'exec python3 -m jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --ServerApp.token="$JUPYTER_TOKEN" --NotebookApp.token="$JUPYTER_TOKEN"'  # noqa: E501
+            )
+        else:
+            script_parts.append(
+                'exec jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --ServerApp.token="$JUPYTER_TOKEN" --NotebookApp.token="$JUPYTER_TOKEN"'  # noqa: E501
+            )
     else:
         script_parts.append("exec tail -f /dev/null")
 
@@ -255,10 +327,34 @@ def create_environment_task(self, environment_id):
 
         enable_jupyter = _is_enabled(getattr(env, "enable_jupyter", True))
         enable_code_server = _is_enabled(getattr(env, "enable_code_server", True))
-        print(
-            f"[Task] Service flags: enable_jupyter={enable_jupyter}, "
-            f"enable_code_server={enable_code_server}"
+        print(f"[Task] Service flags: enable_jupyter={enable_jupyter}, " f"enable_code_server={enable_code_server}")
+
+        if not env.root_password_encrypted:
+            env.status = "error"
+            db.commit()
+            return "password_decryption_failed Missing encrypted root password"
+
+        try:
+            root_password = decrypt_secret(env.root_password_encrypted)
+        except SecretKeyError as error:
+            env.status = "error"
+            db.commit()
+            return f"password_decryption_failed {error}"
+        except SecretCipherError as error:
+            env.status = "error"
+            db.commit()
+            return f"password_decryption_failed {error}"
+
+        jupyter_mode = _validate_runtime_prerequisites(
+            client,
+            image_name,
+            enable_jupyter=enable_jupyter,
+            enable_code_server=enable_code_server,
         )
+        if isinstance(jupyter_mode, str) and jupyter_mode.startswith("missing_prerequisite:"):
+            env.status = "error"
+            db.commit()
+            return jupyter_mode
 
         container_config = {
             "image": image_name,
@@ -268,10 +364,15 @@ def create_environment_task(self, environment_id):
                 "JUPYTER_TOKEN": jupyter_token,
                 "ENABLE_JUPYTER": "1" if enable_jupyter else "0",
                 "ENABLE_CODE_SERVER": "1" if enable_code_server else "0",
+                "ROOT_PASSWORD": root_password,
             },
             "ports": _build_ports_config(env, custom_ports),
             # Keep container running with SSHD
-            "command": _build_runtime_command(env),
+            "command": _build_runtime_command(
+                jupyter_mode if isinstance(jupyter_mode, str) else None,
+                enable_jupyter=enable_jupyter,
+                enable_code_server=enable_code_server,
+            ),
         }
 
         # Add DeviceRequests if GPUs are requested and we are not mocking
