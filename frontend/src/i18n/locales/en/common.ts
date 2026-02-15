@@ -115,7 +115,6 @@ const enCommon = {
     removeCustomPort: 'Remove custom port mapping',
     noCustomPortsAllocated: 'No custom ports allocated',
     dockerfile: 'Dockerfile',
-    managedDockerfileHint: 'Build configuration (service blocks are managed automatically)',
     optionalServices: 'Optional Services',
     optionalServicesDescription: 'Selected services are inserted as managed Dockerfile blocks.',
     enableJupyter: 'Enable JupyterLab',

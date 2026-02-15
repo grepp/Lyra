@@ -25,6 +25,14 @@ const MANAGED_JUPYTER_END = '# <<< LYRA_MANAGED_JUPYTER_END';
 const MANAGED_CODE_START = '# >>> LYRA_MANAGED_CODE_SERVER_START';
 const MANAGED_CODE_END = '# <<< LYRA_MANAGED_CODE_SERVER_END';
 
+const normalizeDockerfile = (text: string): string => {
+  const normalized = text
+    .replace(/\r\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trimEnd();
+  return normalized ? `${normalized}\n` : '';
+};
+
 const stripManagedBlocks = (text: string): string => {
   if (!text) return '';
   let next = text;
@@ -35,7 +43,7 @@ const stripManagedBlocks = (text: string): string => {
   for (const pattern of patterns) {
     next = next.replace(pattern, '');
   }
-  return next.replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
+  return normalizeDockerfile(next);
 };
 
 const buildManagedBlocks = (enableJupyter: boolean, enableCodeServer: boolean): string => {
@@ -130,7 +138,7 @@ export default function Provisioning() {
 
              // Only load Dockerfile content
              if (config.dockerfile_content) {
-               setUserDockerfile(stripManagedBlocks(config.dockerfile_content));
+               setUserDockerfile(normalizeDockerfile(stripManagedBlocks(config.dockerfile_content)));
                setErrors((prev) => ({ ...prev, dockerfile: undefined }));
              }
 
@@ -253,9 +261,13 @@ export default function Provisioning() {
       setTemplateErrors({});
 
       try {
+          const templateDockerfile = normalizeDockerfile(
+            stripManagedBlocks(renderedDockerfile)
+          );
+
           // Only save Dockerfile content as requested
           const config = {
-              dockerfile_content: stripManagedBlocks(userDockerfile)
+              dockerfile_content: templateDockerfile
           };
 
           await axios.post('templates/', {
@@ -738,7 +750,7 @@ export default function Provisioning() {
                                 <button
                                     onClick={() => {
                                         if (template.config.dockerfile_content) {
-                                            setUserDockerfile(stripManagedBlocks(template.config.dockerfile_content));
+                                            setUserDockerfile(normalizeDockerfile(stripManagedBlocks(template.config.dockerfile_content)));
                                             setErrors((prev) => ({ ...prev, dockerfile: undefined }));
                                             setIsLoadModalOpen(false);
                                             showToast(t('feedback.provisioning.templateLoaded'), "success");

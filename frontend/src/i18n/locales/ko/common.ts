@@ -114,7 +114,6 @@ const koCommon = {
     removeCustomPort: '커스텀 포트 매핑 제거',
     noCustomPortsAllocated: '할당된 커스텀 포트가 없습니다',
     dockerfile: 'Dockerfile',
-    managedDockerfileHint: '빌드 설정 (서비스 블록은 체크박스로 자동 관리됨)',
     optionalServices: '선택 서비스',
     optionalServicesDescription: '선택한 서비스는 Dockerfile 관리 블록으로 자동 추가됩니다.',
     enableJupyter: 'JupyterLab 활성화',
