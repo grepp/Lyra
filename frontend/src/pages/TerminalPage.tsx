@@ -478,7 +478,7 @@ export default function TerminalPage() {
 
       <div className="flex-1 min-h-0 rounded-xl border border-[var(--terminal-border)] overflow-hidden shadow-2xl bg-[var(--terminal-bg)]">
         <div className="flex items-center gap-2 border-b border-[var(--terminal-border)] bg-[var(--terminal-bg)] p-2">
-          <div className="flex items-center gap-2 overflow-x-auto min-w-0">
+          <div className="terminal-tabs-scroll flex items-center gap-2 overflow-x-auto min-w-0 pb-1">
             {tabs.map((tab) => {
               const active = tab.id === activeTabId;
               return (
@@ -514,7 +514,7 @@ export default function TerminalPage() {
           <button
             type="button"
             onClick={addTab}
-            className="ml-auto inline-flex items-center gap-1 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/15 transition-colors"
+            className="ml-auto shrink-0 whitespace-nowrap inline-flex items-center gap-1 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-500/15 transition-colors"
             title={t('terminal.addTab')}
           >
             <Plus size={14} />

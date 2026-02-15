@@ -69,3 +69,21 @@
 .scrollbar-hide::-webkit-scrollbar {
     display: none; /* Chrome, Safari and Opera */
 }
+
+.terminal-tabs-scroll {
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: color-mix(in oklab, var(--text-muted) 55%, transparent) transparent;
+}
+
+.terminal-tabs-scroll::-webkit-scrollbar {
+    height: 6px;
+}
+
+.terminal-tabs-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.terminal-tabs-scroll::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--text-muted) 55%, transparent);
+    border-radius: 999px;
+}
