@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { AlertCircle, Lock, Plus, Settings as SettingsIcon, Unlock, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { Terminal } from 'xterm';
@@ -19,10 +19,12 @@ type TerminalTab = {
   id: string;
   number: number;
   sessionKey: string;
+  title?: string;
 };
 
 const TERMINAL_TABS_STORAGE_KEY = 'terminal_tabs_v1';
 const TERMINAL_ACTIVE_TAB_STORAGE_KEY = 'terminal_active_tab_v1';
+const TERMINAL_ACTION_QUEUE_KEY = 'lyra.terminal.pending_action';
 
 const getInitialTabs = (): TerminalTab[] => {
   if (typeof window === 'undefined') {
@@ -52,6 +54,7 @@ const getInitialTabs = (): TerminalTab[] => {
           typeof tab.sessionKey === 'string' && tab.sessionKey.length > 0
             ? tab.sessionKey
             : `lyra_${String(tab.id).replace(/[^a-zA-Z0-9_-]/g, '_')}`,
+        title: typeof tab.title === 'string' && tab.title.trim() ? tab.title.trim() : undefined,
       }));
     return valid.length > 0 ? valid : [{ id: 'terminal-tab-1', number: 1, sessionKey: 'lyra_terminal-tab-1' }];
   } catch {
@@ -82,6 +85,7 @@ export default function TerminalPage() {
   const [activeTabId, setActiveTabId] = useState<string>(() => getInitialActiveTabId(getInitialTabs()));
   const tabCounterRef = useRef(1);
   const decryptedPrivateKeyRef = useRef<string | null>(null);
+  const pendingTabCommandsRef = useRef<Record<string, string>>({});
   const terminalMessagesRef = useRef({
     connectedService: '',
     errorKeyNotFound: '',
@@ -113,6 +117,63 @@ export default function TerminalPage() {
     if (tabs.length === 0) return;
     tabCounterRef.current = Math.max(1, ...tabs.map((tab) => Math.floor(tab.number || 1)));
   }, [tabs]);
+
+  const createTab = useCallback((options?: { initialCommand?: string; titlePrefix?: string }) => {
+    tabCounterRef.current += 1;
+    const nextId = `terminal-tab-${tabCounterRef.current}`;
+    if (options?.initialCommand) {
+      pendingTabCommandsRef.current[nextId] = options.initialCommand;
+    }
+
+    let title: string | undefined;
+    if (options?.titlePrefix) {
+      const prefix = options.titlePrefix.trim();
+      if (prefix) {
+        const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const pattern = new RegExp(`^${escaped}\\s+(\\d+)$`);
+        let maxSuffix = 0;
+        tabs.forEach((tab) => {
+          const currentTitle = (tab.title || '').trim();
+          const match = currentTitle.match(pattern);
+          if (match) {
+            const n = Number(match[1]);
+            if (Number.isFinite(n) && n > maxSuffix) {
+              maxSuffix = n;
+            }
+          }
+        });
+        title = `${prefix} ${maxSuffix + 1}`;
+      }
+    }
+    setTabs((prev) => [
+      ...prev,
+      {
+        id: nextId,
+        number: tabCounterRef.current,
+        sessionKey: `lyra_${nextId.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
+        title,
+      },
+    ]);
+    setActiveTabId(nextId);
+  }, [tabs]);
+
+  useEffect(() => {
+    if (!isUnlocked || isConfigured === false) return;
+    try {
+      const raw = window.localStorage.getItem(TERMINAL_ACTION_QUEUE_KEY);
+      if (!raw) return;
+      const action = JSON.parse(raw) as { type?: string; command?: string; environmentName?: string };
+      window.localStorage.removeItem(TERMINAL_ACTION_QUEUE_KEY);
+      if (action.type === 'open_tab_and_run' && typeof action.command === 'string' && action.command.trim()) {
+        createTab({
+          initialCommand: action.command.trim(),
+          titlePrefix: typeof action.environmentName === 'string' ? action.environmentName : undefined,
+        });
+      }
+    } catch {
+      // Ignore malformed action payloads.
+    }
+  }, [isUnlocked, isConfigured, createTab]);
 
   // Check auth method and configuration first
   useEffect(() => {
@@ -212,6 +273,11 @@ export default function TerminalPage() {
             cols: term.cols,
           }),
         );
+        const pendingCommand = pendingTabCommandsRef.current[tabId];
+        if (pendingCommand) {
+          ws.send(`${pendingCommand}\n`);
+          delete pendingTabCommandsRef.current[tabId];
+        }
       };
 
       ws.onmessage = (event) => {
@@ -284,19 +350,7 @@ export default function TerminalPage() {
     };
   }, []);
 
-  const addTab = () => {
-    tabCounterRef.current += 1;
-    const nextId = `terminal-tab-${tabCounterRef.current}`;
-    setTabs((prev) => [
-      ...prev,
-      {
-        id: nextId,
-        number: tabCounterRef.current,
-        sessionKey: `lyra_${nextId.replace(/[^a-zA-Z0-9_-]/g, '_')}`,
-      },
-    ]);
-    setActiveTabId(nextId);
-  };
+  const addTab = () => createTab();
 
   const closeTab = (tabId: string) => {
     if (tabs.length <= 1) return;
@@ -306,6 +360,7 @@ export default function TerminalPage() {
       session.term.dispose();
       delete terminalSessions.current[tabId];
     }
+    delete pendingTabCommandsRef.current[tabId];
     delete terminalRefs.current[tabId];
 
     const idx = tabs.findIndex((tab) => tab.id === tabId);
@@ -441,7 +496,7 @@ export default function TerminalPage() {
                     onClick={() => setActiveTabId(tab.id)}
                     className="whitespace-nowrap tracking-tight"
                   >
-                    {t('terminal.hostTab', { number: tab.number })}
+                    {tab.title || t('terminal.hostTab', { number: tab.number })}
                   </button>
                   <button
                     type="button"

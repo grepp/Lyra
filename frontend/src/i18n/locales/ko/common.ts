@@ -83,6 +83,7 @@ const koCommon = {
     viewCustomPorts: '커스텀 포트 보기',
     noCustomPorts: '커스텀 포트 없음',
     copySshCommand: 'SSH 명령 복사 (포트: {{port}})',
+    openInTerminal: '터미널에서 열기 (포트: {{port}})',
     environmentMustBeRunning: '환경이 실행 중이어야 합니다 (포트: {{port}})',
     openJupyterLab: 'Jupyter Lab 열기',
     openCodeServer: 'code-server 열기',

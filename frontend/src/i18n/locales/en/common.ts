@@ -84,6 +84,7 @@ const enCommon = {
     viewCustomPorts: 'View Custom Ports',
     noCustomPorts: 'No Custom Ports',
     copySshCommand: 'Copy SSH command (port: {{port}})',
+    openInTerminal: 'Open in Terminal (port: {{port}})',
     environmentMustBeRunning: 'Environment must be running (port: {{port}})',
     openJupyterLab: 'Open Jupyter Lab',
     openCodeServer: 'Open code-server',

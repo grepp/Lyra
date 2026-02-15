@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
@@ -37,10 +38,12 @@ interface Environment {
 }
 
 const ENVS_CACHE_KEY = 'lyra.dashboard.environments';
+const TERMINAL_ACTION_QUEUE_KEY = 'lyra.terminal.pending_action';
 
 export default function Dashboard() {
   const { showToast } = useToast();
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { announcementMarkdown } = useApp();
   const hasAnnouncement = announcementMarkdown.trim().length > 0;
   const [isNoticeOpen, setIsNoticeOpen] = useState(false);
@@ -158,20 +161,24 @@ export default function Dashboard() {
     });
   };
 
-  const copySshCommand = async (sshCommand: string) => {
-    try {
-      await navigator.clipboard.writeText(sshCommand);
-      showToast(t('feedback.dashboard.sshCopied'), 'success');
-    } catch {
-      showToast(t('feedback.dashboard.copyFailedRunManually', { command: sshCommand }), 'error');
-    }
-  };
-
-  const copyEnvSshCommand = async (env: Environment) => {
+  const openEnvInTerminal = (env: Environment) => {
     const host = window.location.hostname;
     const sshUser = env.container_user || 'root';
     const sshCommand = `ssh -p ${env.ssh_port} ${sshUser}@${host}`;
-    await copySshCommand(sshCommand);
+    try {
+      window.localStorage.setItem(
+        TERMINAL_ACTION_QUEUE_KEY,
+        JSON.stringify({
+          type: 'open_tab_and_run',
+          command: sshCommand,
+          environmentName: env.name,
+          requestedAt: Date.now(),
+        }),
+      );
+    } catch {
+      // Ignore storage failures and still move to terminal page.
+    }
+    navigate('/terminal');
   };
 
   const openJupyter = async (env: Environment) => {
@@ -225,7 +232,7 @@ export default function Dashboard() {
         node: (
           <div className="relative group">
             <button
-              onClick={() => copyEnvSshCommand(env)}
+              onClick={() => openEnvInTerminal(env)}
               disabled={!isRunning}
               className="p-1 hover:bg-[var(--bg-soft)] rounded text-[var(--text-muted)] hover:text-blue-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -233,7 +240,7 @@ export default function Dashboard() {
             </button>
             <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-[var(--text)] opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
               {isRunning
-                ? t('dashboard.copySshCommand', { port: env.ssh_port })
+                ? t('dashboard.openInTerminal', { port: env.ssh_port })
                 : t('dashboard.environmentMustBeRunning', { port: env.ssh_port })}
             </div>
           </div>
