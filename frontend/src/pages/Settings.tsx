@@ -313,7 +313,7 @@ export default function Settings() {
     }
   };
 
-  const resolvePrivateKeyForTmuxOps = async (): Promise<string | undefined> => {
+  const resolvePrivateKeyForTmuxOps = useCallback(async (): Promise<string | undefined> => {
     if (sshSettings.authMethod !== 'key') return undefined;
     if (sshSettings.privateKey) return sshSettings.privateKey;
 
@@ -329,9 +329,9 @@ export default function Settings() {
     } catch {
       throw new Error(t('feedback.settings.tmuxKeyDecryptFailed'));
     }
-  };
+  }, [sshSettings.authMethod, sshSettings.privateKey, sshSettings.masterPassword, t]);
 
-  const loadTmuxSessions = async () => {
+  const loadTmuxSessions = useCallback(async () => {
     try {
       setTmuxLoading(true);
       setSessionStatus({ type: 'loading', message: t('feedback.settings.tmuxSessionsLoading') });
@@ -366,7 +366,12 @@ export default function Settings() {
     } finally {
       setTmuxLoading(false);
     }
-  };
+  }, [resolvePrivateKeyForTmuxOps, t]);
+
+  useEffect(() => {
+    if (isSettingsLoading) return;
+    void loadTmuxSessions();
+  }, [isSettingsLoading, loadTmuxSessions]);
 
   const killSelectedTmuxSessions = async () => {
     if (selectedTmuxSessions.length === 0) {
