@@ -124,6 +124,11 @@ You can manually run all checks across the codebase:
 pre-commit run --all-files
 ```
 
+Backend tests (recommended invocation):
+```bash
+cd backend && pytest -q
+```
+
 ### Database Migrations
 This project uses **Alembic** for handling database schema changes.
 
@@ -178,7 +183,7 @@ Error policy:
   - `reject` (recommended): unknown/untrusted host keys are rejected
   - `accept-new` (development only): unknown keys are auto-accepted
 - `SSH_KNOWN_HOSTS_PATH` points to the known_hosts file used for trust checks.
-- If `ssh_host_fingerprint` setting is configured, fingerprint validation is applied after connect and takes precedence over implicit trust.
+- If `ssh_host_fingerprint` setting is configured, fingerprint validation is applied before authentication and takes precedence over implicit trust.
 - Fingerprint formats:
   - `SHA256:<base64>`
   - MD5 fingerprint (`aa:bb:...`) also supported for compatibility
@@ -245,7 +250,7 @@ npm --prefix frontend run build
 
 - Supported app themes: `dark`, `light`
 - Persisted key: `lyra.theme` (browser `localStorage`)
-- Default theme: `dark`
+- Default theme: `light`
 - Terminal (`xterm`) is intentionally fixed to dark for readability/consistency
 
 ### Theme Structure
