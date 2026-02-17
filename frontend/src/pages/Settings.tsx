@@ -7,6 +7,7 @@ import { useTheme } from '../context/ThemeContext';
 import { withApiMessage } from '../utils/i18nMessage';
 import { decrypt, encrypt } from '../utils/crypto';
 import OverlayPortal from '../components/OverlayPortal';
+import { getStoredUserName, setStoredUserName } from '../utils/userIdentity';
 
 type StatusState = { type: 'idle' | 'loading' | 'success' | 'error'; message?: string };
 type TmuxSession = { name: string; attached: number; windows: number };
@@ -24,8 +25,10 @@ export default function Settings() {
   const { t, i18n } = useTranslation();
   const { theme, setTheme } = useTheme();
   const [localAppName, setLocalAppName] = useState(appName);
+  const [localUserName, setLocalUserName] = useState(() => getStoredUserName());
   const [localFaviconDataUrl, setLocalFaviconDataUrl] = useState(faviconDataUrl);
   const [appNameStatus, setAppNameStatus] = useState<StatusState>({ type: 'idle' });
+  const [userNameStatus, setUserNameStatus] = useState<StatusState>({ type: 'idle' });
   const [faviconStatus, setFaviconStatus] = useState<StatusState>({ type: 'idle' });
   const [announcementStatus, setAnnouncementStatus] = useState<StatusState>({ type: 'idle' });
   const [sshStatus, setSshStatus] = useState<StatusState>({ type: 'idle' });
@@ -147,6 +150,31 @@ export default function Settings() {
     } catch (error) {
       console.error(error);
       setAppNameStatus({ type: 'error', message: t('feedback.settings.appNameUpdateFailed') });
+    }
+  };
+
+  const handleSaveUserName = (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const result = setStoredUserName(localUserName);
+      if (result.code !== 'ok') {
+        if (result.code === 'empty') {
+          setUserNameStatus({ type: 'error', message: t('feedback.settings.userNameRequired') });
+          return;
+        }
+        if (result.code === 'too_long') {
+          setUserNameStatus({ type: 'error', message: t('feedback.settings.userNameTooLong') });
+          return;
+        }
+        setUserNameStatus({ type: 'error', message: t('feedback.settings.userNameFormatInvalid') });
+        return;
+      }
+      setLocalUserName(result.value);
+      setUserNameStatus({ type: 'success', message: t('feedback.settings.userNameUpdated') });
+      setTimeout(() => setUserNameStatus({ type: 'idle' }), 3000);
+    } catch (error) {
+      console.error(error);
+      setUserNameStatus({ type: 'error', message: t('feedback.settings.userNameUpdateFailed') });
     }
   };
 
@@ -578,6 +606,29 @@ export default function Settings() {
                 <button type="submit" disabled={isLoading} className={`${primaryButtonClass} px-6 font-medium flex items-center gap-2`}><Save size={18} />{t('actions.save')}</button>
               </div>
             </div>
+            <div>
+              <label htmlFor="userName" className="mb-2 block text-sm font-medium text-[var(--text-muted)]">{t('settings.userName')}</label>
+              <div className="flex gap-4">
+                <input
+                  id="userName"
+                  type="text"
+                  placeholder={t('settings.userNamePlaceholder')}
+                  value={localUserName}
+                  onChange={(e) => setLocalUserName(e.target.value)}
+                  disabled={isLoading}
+                  className={`flex-1 ${inputClass}`}
+                />
+                <button
+                  type="button"
+                  disabled={isLoading}
+                  onClick={handleSaveUserName}
+                  className={`${primaryButtonClass} px-6 font-medium flex items-center gap-2`}
+                >
+                  <Save size={18} />
+                  {t('actions.save')}
+                </button>
+              </div>
+            </div>
 
             <div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -697,6 +748,16 @@ export default function Settings() {
               }`}>
                 {faviconStatus.type === 'success' ? <CheckCircle2 size={18} className="shrink-0" /> : <AlertCircle size={18} className="shrink-0" />}
                 <span className="font-medium">{faviconStatus.message}</span>
+              </div>
+            )}
+            {userNameStatus.message && (
+              <div className={`flex items-center gap-2 text-sm p-3 rounded-lg border ${
+                userNameStatus.type === 'success'
+                  ? 'text-green-400 bg-green-500/5 border-green-500/20'
+                  : 'text-red-400 bg-red-500/5 border-red-500/20'
+              }`}>
+                {userNameStatus.type === 'success' ? <CheckCircle2 size={18} className="shrink-0" /> : <AlertCircle size={18} className="shrink-0" />}
+                <span className="font-medium">{userNameStatus.message}</span>
               </div>
             )}
             {announcementStatus.message && (
