@@ -75,6 +75,8 @@ const enCommon = {
     customPortMappings: 'Custom Port Mappings',
     customPortsFor: 'Custom ports for {{name}}',
     containerErrorLog: 'Container Error Log',
+    containerDiagnostics: 'Container Diagnostics',
+    recentLogs: 'Recent Logs',
     last50LinesFor: 'Last 50 lines of logs for {{name}}',
     noLogsAvailable: 'No logs available.',
     viewErrorLogs: 'View Error Logs',

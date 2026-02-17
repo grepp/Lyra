@@ -104,6 +104,41 @@ export default function Dashboard() {
     return translated === key ? t('status.unknown') : translated;
   };
 
+  const parseErrorLogSections = (raw: string) => {
+    const text = String(raw || '').trim();
+    if (!text) {
+      return { diagnostics: '', recentLogs: '' };
+    }
+    const stripSectionHeader = (value: string, header: string) => {
+      const normalized = value.trim();
+      if (normalized.startsWith(header)) {
+        return normalized.slice(header.length).trim();
+      }
+      return normalized;
+    };
+
+    const marker = '\n\n[Recent Logs]\n';
+    if (text.includes(marker)) {
+      const [head, tail] = text.split(marker, 2);
+      return {
+        diagnostics: stripSectionHeader(head, '[Container Diagnostics]'),
+        recentLogs: stripSectionHeader(tail, '[Recent Logs]'),
+      };
+    }
+
+    if (text.startsWith('[Container Diagnostics]')) {
+      return {
+        diagnostics: stripSectionHeader(text, '[Container Diagnostics]'),
+        recentLogs: '',
+      };
+    }
+
+    return {
+      diagnostics: '',
+      recentLogs: text,
+    };
+  };
+
   const fetchEnvironments = async (options: { showLoading?: boolean } = {}) => {
     const { showLoading = false } = options;
     const requestId = showLoading ? ++refreshRequestIdRef.current : refreshRequestIdRef.current;
@@ -381,6 +416,8 @@ export default function Dashboard() {
     );
   };
 
+  const parsedErrorLog = parseErrorLogSections(errorLog);
+
   return (
     <div className="p-6 space-y-6 relative">
       <Modal
@@ -493,17 +530,34 @@ export default function Dashboard() {
                 </div>
                 <div className="p-6">
                     <p className="text-[var(--text-muted)] text-sm mb-4">{t('dashboard.last50LinesFor', { name: errorLogEnv.name })}</p>
-                    <div className="bg-[var(--bg-soft)] rounded-lg border border-[var(--border)] p-4 max-h-[400px] overflow-y-auto">
-                        {logLoading ? (
+                    {logLoading ? (
+                        <div className="bg-[var(--bg-soft)] rounded-lg border border-[var(--border)] p-4 max-h-[400px] overflow-y-auto">
                             <div className="flex items-center justify-center py-8 text-[var(--text-muted)]">
                                 <RefreshCw size={24} className="animate-spin" />
                             </div>
-                        ) : (
-                            <pre className="text-xs font-mono text-[var(--text)] whitespace-pre-wrap font-ligatures-none">
-                                {errorLog || t('dashboard.noLogsAvailable')}
-                            </pre>
-                        )}
-                    </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-3 max-h-[440px] overflow-y-auto">
+                            {parsedErrorLog.diagnostics && (
+                                <div className="bg-[var(--bg-soft)] rounded-lg border border-[var(--border)] p-4">
+                                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                                      {t('dashboard.containerDiagnostics')}
+                                    </p>
+                                    <pre className="text-xs font-mono text-[var(--text)] whitespace-pre-wrap font-ligatures-none">
+                                        {parsedErrorLog.diagnostics}
+                                    </pre>
+                                </div>
+                            )}
+                            <div className="bg-[var(--bg-soft)] rounded-lg border border-[var(--border)] p-4">
+                                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                                  {t('dashboard.recentLogs')}
+                                </p>
+                                <pre className="text-xs font-mono text-[var(--text)] whitespace-pre-wrap font-ligatures-none">
+                                    {parsedErrorLog.recentLogs || t('dashboard.noLogsAvailable')}
+                                </pre>
+                            </div>
+                        </div>
+                    )}
                 </div>
                 <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-soft)] flex justify-end">
                     <button

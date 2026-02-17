@@ -95,6 +95,27 @@ def _cleanup_expired_code_tickets():
         code_launch_tickets.pop(ticket, None)
 
 
+def _format_container_state_summary(container) -> str:
+    state = container.attrs.get("State", {}) if container is not None else {}
+    exit_code = state.get("ExitCode")
+    oom_killed = state.get("OOMKilled")
+    error_msg = str(state.get("Error", "") or "").strip()
+    finished_at = str(state.get("FinishedAt", "") or "").strip()
+    status = str(state.get("Status", "") or "").strip() or str(getattr(container, "status", "") or "").strip()
+
+    details = [
+        "[Container Diagnostics]",
+        f"Status: {status or 'unknown'}",
+        f"ExitCode: {exit_code if exit_code is not None else 'unknown'}",
+        f"OOMKilled: {oom_killed if oom_killed is not None else 'unknown'}",
+    ]
+    if finished_at and finished_at != "0001-01-01T00:00:00Z":
+        details.append(f"FinishedAt: {finished_at}")
+    if error_msg:
+        details.append(f"Error: {error_msg}")
+    return "\n".join(details)
+
+
 def _detect_total_gpus() -> int:
     import pynvml
 
@@ -968,18 +989,14 @@ async def get_environment_logs(environment_id: str, db: AsyncSession = Depends(g
         container = client.containers.get(container_name)
         logs = container.logs(tail=50)
         logs_text = logs.decode('utf-8').strip() if logs else ""
+        state_summary = _format_container_state_summary(container)
 
         if not logs_text:
-            state = container.attrs.get('State', {})
-            exit_code = state.get('ExitCode')
-            error_msg = state.get('Error', "")
+            return {"logs": f"{state_summary}\n\nNo logs produced by this container."}
 
-            if error_msg:
-                return {"logs": error_msg}
-            if exit_code is not None:
-                return {"logs": f"Container exited with code: {exit_code}, but no logs were produced."}
-
-            return {"logs": "No logs produced by this container."}
+        # For failed/stopped containers, include state diagnostics above recent logs.
+        if env.status == "error" or container.status in {"exited", "dead"}:
+            return {"logs": f"{state_summary}\n\n[Recent Logs]\n{logs_text}"}
 
         return {"logs": logs_text}
     except docker.errors.NotFound:

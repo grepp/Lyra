@@ -74,6 +74,8 @@ const koCommon = {
     customPortMappings: '커스텀 포트 매핑',
     customPortsFor: '{{name}}의 커스텀 포트',
     containerErrorLog: '컨테이너 오류 로그',
+    containerDiagnostics: '컨테이너 진단 정보',
+    recentLogs: '최근 로그',
     last50LinesFor: '{{name}}의 최근 50줄 로그',
     noLogsAvailable: '로그가 없습니다.',
     viewErrorLogs: '오류 로그 보기',
