@@ -840,7 +840,7 @@ export default function Dashboard() {
                           .map((env) => (
                             <tr key={env.id} className="hover:bg-[var(--bg-soft)] transition-colors">
                                 <td className="px-6 py-4 w-[30%] max-w-0">
-                                  <div className="flex items-center gap-2 min-w-0">
+                                  <div className="inline-flex max-w-full items-center gap-2 min-w-0">
                                     <div className="relative group min-w-0 max-w-[22rem]">
                                       <span className="block truncate whitespace-nowrap text-[var(--text)] font-medium">
                                         {env.name}
