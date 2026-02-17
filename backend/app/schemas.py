@@ -41,6 +41,7 @@ class EnvironmentResponse(EnvironmentBase):
     jupyter_port: int
     code_port: int
     worker_server_name: Optional[str] = None
+    worker_server_base_url: Optional[str] = None
     worker_error_code: Optional[str] = None
     worker_error_message: Optional[str] = None
     created_at: datetime

@@ -794,6 +794,7 @@ async def read_environments(skip: int = 0, limit: int = 100, db: AsyncSession = 
                 env_dict = {
                     **env.__dict__,
                     "worker_server_name": None,
+                    "worker_server_base_url": None,
                     "worker_error_code": "worker_not_found",
                     "worker_error_message": "Worker server not found",
                     "container_id": None,
@@ -817,6 +818,7 @@ async def read_environments(skip: int = 0, limit: int = 100, db: AsyncSession = 
                 env_dict = {
                     **env.__dict__,
                     "worker_server_name": worker.name,
+                    "worker_server_base_url": worker.base_url,
                     "worker_error_code": f"worker_health_{worker.last_health_status}",
                     "worker_error_message": worker_health_message_cache.get(worker.id)
                     or "Worker server is unreachable",
@@ -854,6 +856,7 @@ async def read_environments(skip: int = 0, limit: int = 100, db: AsyncSession = 
             env_dict = {
                 **env.__dict__,
                 "worker_server_name": worker.name,
+                "worker_server_base_url": worker.base_url,
                 "worker_error_code": worker_error_code,
                 "worker_error_message": worker_error_message,
                 "container_id": container_id,
@@ -899,6 +902,7 @@ async def read_environments(skip: int = 0, limit: int = 100, db: AsyncSession = 
         env_dict = {
             **env.__dict__,
             "worker_server_name": None,
+            "worker_server_base_url": None,
             "worker_error_code": None,
             "worker_error_message": None,
             "container_id": container_id,
@@ -921,6 +925,7 @@ async def read_environment(environment_id: str, db: AsyncSession = Depends(get_d
         raise HTTPException(status_code=404, detail="Environment not found")
 
     worker_server_name = None
+    worker_server_base_url = None
     worker_error_code = None
     worker_error_message = None
 
@@ -928,6 +933,7 @@ async def read_environment(environment_id: str, db: AsyncSession = Depends(get_d
         worker = await _get_worker_server_by_id(db, env.worker_server_id)
         if worker:
             worker_server_name = worker.name
+            worker_server_base_url = worker.base_url
             try:
                 remote_env = await call_worker_api(
                     worker,
@@ -956,6 +962,7 @@ async def read_environment(environment_id: str, db: AsyncSession = Depends(get_d
         **env.__dict__,
         "custom_ports": custom_ports,
         "worker_server_name": worker_server_name,
+        "worker_server_base_url": worker_server_base_url,
         "worker_error_code": worker_error_code,
         "worker_error_message": worker_error_message,
     }

@@ -26,6 +26,7 @@ interface Environment {
   name: string;
   status: string;
   worker_server_name?: string | null;
+  worker_server_base_url?: string | null;
   worker_error_code?: string | null;
   worker_error_message?: string | null;
   container_user?: string;
@@ -351,9 +352,37 @@ export default function Dashboard() {
   };
 
   const openEnvInTerminal = (env: Environment) => {
-    const host = window.location.hostname;
+    const resolveSshHost = () => {
+      if (!env.worker_server_name) {
+        return window.location.hostname;
+      }
+      const baseUrl = env.worker_server_base_url || '';
+      if (baseUrl) {
+        try {
+          return new URL(baseUrl).hostname;
+        } catch {
+          // Fall through to worker name.
+        }
+      }
+      return env.worker_server_name;
+    };
+
+    const host = resolveSshHost();
     const sshUser = env.container_user || 'root';
     const sshCommand = `ssh -p ${env.ssh_port} ${sshUser}@${host}`;
+
+    if (env.worker_server_name) {
+      navigator.clipboard
+        .writeText(sshCommand)
+        .then(() => {
+          showToast(t('feedback.dashboard.sshCopied'), 'success');
+        })
+        .catch(() => {
+          showToast(t('feedback.dashboard.copyFailedRunManually', { command: sshCommand }), 'error');
+        });
+      return;
+    }
+
     try {
       window.localStorage.setItem(
         TERMINAL_ACTION_QUEUE_KEY,
@@ -444,7 +473,7 @@ export default function Dashboard() {
     const jupyterEnabled = env.enable_jupyter !== false;
     const codeEnabled = env.enable_code_server !== false;
 
-    const sshSupported = !env.worker_server_name;
+    const isWorkerEnv = Boolean(env.worker_server_name);
 
     const accessItems: Array<{ key: string; node: ReactNode }> = [
       {
@@ -453,15 +482,15 @@ export default function Dashboard() {
           <div className="relative group">
             <button
               onClick={() => openEnvInTerminal(env)}
-              disabled={!isRunning || !sshSupported}
+              disabled={!isRunning}
               className="p-1 hover:bg-[var(--bg-soft)] rounded text-[var(--text-muted)] hover:text-blue-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <SquareTerminal size={14} />
             </button>
             <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-[var(--text)] opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
-              {!sshSupported
-                ? t('dashboard.openInTerminalWorkerUnsupported')
-                : isRunning
+              {isWorkerEnv && isRunning
+                ? t('dashboard.copySshCommand', { port: env.ssh_port })
+                : !isWorkerEnv && isRunning
                 ? t('dashboard.openInTerminal', { port: env.ssh_port })
                 : t('dashboard.environmentMustBeRunning', { port: env.ssh_port })}
             </div>
