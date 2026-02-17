@@ -487,7 +487,7 @@ export default function Dashboard() {
 
       {hasAnnouncement && (
         <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] overflow-hidden">
-          <div className="p-6 border-b border-[var(--border)] flex items-center justify-between">
+          <div className={`p-6 flex items-center justify-between ${isNoticeOpen ? 'border-b border-[var(--border)]' : ''}`}>
             <h3 className="inline-flex items-start gap-2 text-xl font-bold text-[var(--text)]">
               <span>{t('dashboard.noticeTitle')}</span>
               <span className="mt-1.5 inline-block h-2 w-2 rounded-full bg-red-500" aria-hidden="true" />
