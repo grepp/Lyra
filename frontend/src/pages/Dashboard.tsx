@@ -206,11 +206,19 @@ export default function Dashboard() {
     }
   };
 
-  const openCodeServer = (env: Environment) => {
-    const protocol = window.location.protocol;
-    const host = window.location.hostname;
-    const url = `${protocol}//${host}:${env.code_port}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+  const openCodeServer = async (env: Environment) => {
+    try {
+      const res = await axios.post(`environments/${env.id}/code/launch`);
+      const launchUrl = String(res.data.launch_url || '');
+      if (!launchUrl) {
+        showToast(t('feedback.dashboard.codeLaunchUrlMissing'), 'error');
+        return;
+      }
+      const targetUrl = launchUrl.startsWith('http') ? launchUrl : `${window.location.origin}${launchUrl}`;
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
+    } catch {
+      showToast(t('feedback.dashboard.codeOpenFailed'), 'error');
+    }
   };
 
   useEffect(() => {

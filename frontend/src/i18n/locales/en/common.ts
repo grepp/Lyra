@@ -302,6 +302,8 @@ const enCommon = {
       copyFailedRunManually: 'Unable to copy. Run manually: {{command}}',
       jupyterLaunchUrlMissing: 'Unable to open Jupyter: launch URL was not returned.',
       jupyterOpenFailed: 'Unable to open Jupyter. Please ensure the environment is running.',
+      codeLaunchUrlMissing: 'Unable to open code-server: launch URL was not returned.',
+      codeOpenFailed: 'Unable to open code-server. Please ensure the environment is running.',
     },
     provisioning: {
       allocateCustomPortFailed: 'Unable to allocate a custom port.',

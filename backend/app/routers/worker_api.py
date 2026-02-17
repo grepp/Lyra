@@ -27,6 +27,8 @@ async def worker_gpu_resources(db: AsyncSession = Depends(get_db)):
 
 @router.post("/environments")
 async def worker_create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(get_db)):
+    # Worker nodes should always create local containers.
+    env.worker_server_id = None
     return await env_router.create_environment(env=env, db=db)
 
 
@@ -58,3 +60,13 @@ async def worker_stop_environment(environment_id: str, db: AsyncSession = Depend
 @router.delete("/environments/{environment_id}")
 async def worker_delete_environment(environment_id: str, db: AsyncSession = Depends(get_db)):
     return await env_router.delete_environment(environment_id=environment_id, db=db)
+
+
+@router.post("/environments/{environment_id}/jupyter/launch")
+async def worker_create_jupyter_launch_url(environment_id: str, db: AsyncSession = Depends(get_db)):
+    return await env_router.create_jupyter_launch_url(environment_id=environment_id, db=db)
+
+
+@router.post("/environments/{environment_id}/code/launch")
+async def worker_create_code_launch_url(environment_id: str, db: AsyncSession = Depends(get_db)):
+    return await env_router.create_code_launch_url(environment_id=environment_id, db=db)

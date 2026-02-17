@@ -300,6 +300,8 @@ const koCommon = {
       copyFailedRunManually: '복사할 수 없습니다. 수동 실행: {{command}}',
       jupyterLaunchUrlMissing: 'Jupyter를 열 수 없습니다: 실행 URL을 받지 못했습니다.',
       jupyterOpenFailed: 'Jupyter를 열 수 없습니다. 환경이 실행 중인지 확인해주세요.',
+      codeLaunchUrlMissing: 'code-server를 열 수 없습니다: 실행 URL을 받지 못했습니다.',
+      codeOpenFailed: 'code-server를 열 수 없습니다. 환경이 실행 중인지 확인해주세요.',
     },
     provisioning: {
       allocateCustomPortFailed: '커스텀 포트를 할당할 수 없습니다.',

@@ -17,6 +17,7 @@ class CustomPortMapping(BaseModel):
 
 class EnvironmentBase(BaseModel):
     name: str = Field(pattern=r"^[a-zA-Z0-9-]+$")
+    worker_server_id: Optional[UUID] = None
     container_user: str = "root"
     dockerfile_content: Optional[str] = None
     enable_jupyter: bool = True

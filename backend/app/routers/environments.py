@@ -4,9 +4,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import text
 from typing import List
+from uuid import UUID
 from ..database import get_db
-from ..models import Environment, Setting
+from ..models import Environment, Setting, WorkerServer
 from ..core.security import SecretCipherError, SecretKeyError, encrypt_secret
+from ..core.worker_registry import (
+    WORKER_HEALTH_HEALTHY,
+    WorkerRequestError,
+    call_worker_api,
+    refresh_worker_health,
+)
 from ..schemas import (
     CustomPortAllocateRequest,
     CustomPortAllocateResponse,
@@ -30,12 +37,15 @@ router = APIRouter(
 
 JUPYTER_LAUNCH_TTL_SECONDS = 60
 jupyter_launch_tickets: dict[str, dict[str, str | float | bool]] = {}
+CODE_LAUNCH_TTL_SECONDS = 60
+code_launch_tickets: dict[str, dict[str, str | float | bool]] = {}
 MAX_PORT_ALLOCATION_RETRIES = 8
 CUSTOM_HOST_PORT_RANGE = (35001, 60000)
 CUSTOM_CONTAINER_PORT_RANGE = (10000, 20000)
 RESERVED_CONTAINER_PORTS = {22, 8080, 8888}
 GPU_ALLOCATION_LOCK_KEY = 93821
 GPU_OCCUPIED_STATUSES = {"creating", "building", "running", "starting"}
+REMOTE_SURROGATE_PORT_RANGE = (61001, 65535)
 logger = logging.getLogger(__name__)
 
 
@@ -55,6 +65,17 @@ def _cleanup_expired_jupyter_tickets():
     ]
     for ticket in expired:
         jupyter_launch_tickets.pop(ticket, None)
+
+
+def _cleanup_expired_code_tickets():
+    now = time.time()
+    expired = [
+        ticket
+        for ticket, meta in code_launch_tickets.items()
+        if meta.get("used") or float(meta.get("expires_at", 0)) < now
+    ]
+    for ticket in expired:
+        code_launch_tickets.pop(ticket, None)
 
 
 def _detect_total_gpus() -> int:
@@ -129,6 +150,60 @@ async def _get_custom_ports_for_environment(db: AsyncSession, environment_id: st
         return _normalize_custom_ports(parsed)
     except Exception:
         return []
+
+
+async def _get_worker_server_by_id(db: AsyncSession, worker_server_id: UUID | str | None) -> WorkerServer | None:
+    if not worker_server_id:
+        return None
+    worker_uuid = worker_server_id
+    if isinstance(worker_server_id, str):
+        try:
+            worker_uuid = UUID(worker_server_id)
+        except Exception:
+            return None
+    result = await db.execute(select(WorkerServer).where(WorkerServer.id == worker_uuid))
+    return result.scalars().first()
+
+
+async def _assert_worker_is_ready(db: AsyncSession, worker_server_id: UUID | str | None) -> WorkerServer:
+    worker = await _get_worker_server_by_id(db, worker_server_id)
+    if not worker:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "worker_not_found", "message": "Worker server not found"},
+        )
+    if not worker.is_active:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "worker_inactive", "message": "Worker server is inactive"},
+        )
+    health = await refresh_worker_health(db, worker)
+    if health.status != WORKER_HEALTH_HEALTHY:
+        await db.commit()
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "worker_unreachable", "message": health.message},
+        )
+    await db.commit()
+    return worker
+
+
+def _map_worker_request_error(error: WorkerRequestError) -> HTTPException:
+    return HTTPException(
+        status_code=error.status_code,
+        detail={"code": error.code, "message": error.message},
+    )
+
+
+async def _allocate_remote_surrogate_ports(db: AsyncSession) -> tuple[int, int, int]:
+    blocked = await _collect_blocked_host_ports(db)
+    start, end = REMOTE_SURROGATE_PORT_RANGE
+    ssh_port = _pick_free_port(start, end, blocked)
+    blocked.add(ssh_port)
+    jupyter_port = _pick_free_port(start, end, blocked)
+    blocked.add(jupyter_port)
+    code_port = _pick_free_port(start, end, blocked)
+    return ssh_port, jupyter_port, code_port
 
 
 def _get_docker_used_ports() -> set[int]:
@@ -308,6 +383,79 @@ async def create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(
             detail={"code": "password_encryption_failed", "message": str(error)},
         ) from error
 
+    if env.worker_server_id:
+        worker = await _assert_worker_is_ready(db, env.worker_server_id)
+        remote_payload = {
+            "name": env.name,
+            "container_user": env.container_user,
+            "dockerfile_content": env.dockerfile_content,
+            "enable_jupyter": env.enable_jupyter,
+            "enable_code_server": env.enable_code_server,
+            "mount_config": [m.model_dump() for m in env.mount_config],
+            "custom_ports": [p.model_dump() for p in env.custom_ports],
+            "gpu_count": env.gpu_count,
+            "selected_gpu_indices": env.selected_gpu_indices,
+            "root_password": env.root_password,
+            "worker_server_id": None,
+        }
+        try:
+            remote_env = await call_worker_api(
+                worker,
+                method="POST",
+                path="/api/worker/environments",
+                payload=remote_payload,
+            )
+        except WorkerRequestError as error:
+            raise _map_worker_request_error(error) from error
+
+        try:
+            remote_env_id = UUID(str(remote_env.get("id", "")))
+        except Exception as error:
+            raise HTTPException(
+                status_code=502,
+                detail={"code": "worker_api_mismatch", "message": "Worker response did not include a valid id"},
+            ) from error
+
+        gpu_indices = [int(idx) for idx in (remote_env.get("gpu_indices") or env.selected_gpu_indices or [])]
+        custom_ports = _normalize_custom_ports(remote_env.get("custom_ports") or env.custom_ports)
+        _validate_custom_ports(custom_ports)
+        surrogate_ssh_port, surrogate_jupyter_port, surrogate_code_port = await _allocate_remote_surrogate_ports(db)
+
+        created_env = None
+        try:
+            async with db.begin():
+                created_env = Environment(
+                    id=remote_env_id,
+                    name=env.name,
+                    worker_server_id=worker.id,
+                    container_user=env.container_user,
+                    root_password="__redacted__",
+                    root_password_encrypted=encrypted_root_password,
+                    dockerfile_content=env.dockerfile_content,
+                    enable_jupyter=env.enable_jupyter,
+                    enable_code_server=env.enable_code_server,
+                    mount_config=[m.model_dump() for m in env.mount_config],
+                    gpu_indices=gpu_indices,
+                    ssh_port=surrogate_ssh_port,
+                    jupyter_port=surrogate_jupyter_port,
+                    code_port=surrogate_code_port,
+                    status=str(remote_env.get("status") or "building"),
+                )
+                db.add(created_env)
+                db.add(Setting(key=f"custom_ports:{created_env.id}", value=json.dumps(custom_ports)))
+        except IntegrityError as error:
+            await db.rollback()
+            if _is_name_unique_violation(error):
+                raise HTTPException(
+                    status_code=409,
+                    detail={"code": "duplicate_environment_name", "message": "Environment name already exists"},
+                ) from error
+            raise
+
+        env_dict = {**created_env.__dict__, "custom_ports": custom_ports}
+        env_dict.pop("_sa_instance_state", None)
+        return env_dict
+
     # GPU allocation logic
     gpu_indices: list[int] = []
     requested_indices = [int(idx) for idx in (env.selected_gpu_indices or [])]
@@ -455,9 +603,7 @@ async def create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(
                 rollback_env = await db.execute(select(Environment).where(Environment.id == new_env.id))
                 env_to_remove = rollback_env.scalars().first()
                 if env_to_remove:
-                    token_result = await db.execute(
-                        select(Setting).where(Setting.key == f"jupyter_token:{new_env.id}")
-                    )
+                    token_result = await db.execute(select(Setting).where(Setting.key == f"jupyter_token:{new_env.id}"))
                     token_setting = token_result.scalars().first()
                     if token_setting:
                         await db.delete(token_setting)
@@ -555,6 +701,15 @@ async def read_environments(skip: int = 0, limit: int = 100, db: AsyncSession = 
     result = await db.execute(select(Environment).offset(skip).limit(limit))
     envs = result.scalars().all()
     custom_ports_map = await _get_custom_ports_map(db)
+    worker_ids = {getattr(env, "worker_server_id", None) for env in envs if getattr(env, "worker_server_id", None)}
+    worker_map: dict[UUID, WorkerServer] = {}
+    if worker_ids:
+        workers_result = await db.execute(select(WorkerServer).where(WorkerServer.id.in_(worker_ids)))
+        workers = workers_result.scalars().all()
+        worker_map = {worker.id: worker for worker in workers}
+
+    worker_health_cache: dict[UUID, bool] = {}
+    status_changed = False
 
     client = None
     docker_available = True
@@ -567,12 +722,74 @@ async def read_environments(skip: int = 0, limit: int = 100, db: AsyncSession = 
         docker_available = False
         logger.warning("Unexpected Docker client initialization failure: %s", error)
 
-    status_changed = False
     env_responses = []
 
     for env in envs:
         container_name = f"lyra-{env.name}-{env.id}"
         container_id: str | None = None
+
+        env_worker_server_id = getattr(env, "worker_server_id", None)
+        if env_worker_server_id:
+            worker = worker_map.get(env_worker_server_id)
+            if not worker:
+                if env.status != "error":
+                    env.status = "error"
+                    status_changed = True
+                env_dict = {
+                    **env.__dict__,
+                    "container_id": None,
+                    "custom_ports": custom_ports_map.get(str(env.id), []),
+                }
+                env_dict.pop("_sa_instance_state", None)
+                env_responses.append(env_dict)
+                continue
+
+            healthy = worker_health_cache.get(worker.id)
+            if healthy is None:
+                health = await refresh_worker_health(db, worker)
+                healthy = health.status == WORKER_HEALTH_HEALTHY
+                worker_health_cache[worker.id] = healthy
+
+            if not healthy:
+                if env.status != "error":
+                    env.status = "error"
+                    status_changed = True
+                env_dict = {
+                    **env.__dict__,
+                    "container_id": None,
+                    "custom_ports": custom_ports_map.get(str(env.id), []),
+                }
+                env_dict.pop("_sa_instance_state", None)
+                env_responses.append(env_dict)
+                continue
+
+            try:
+                remote_env = await call_worker_api(
+                    worker,
+                    method="GET",
+                    path=f"/api/worker/environments/{env.id}",
+                )
+                remote_status = str(remote_env.get("status") or env.status)
+                if env.status != remote_status:
+                    env.status = remote_status
+                    status_changed = True
+                container_id = remote_env.get("container_id")
+                if isinstance(container_id, str) and len(container_id) > 12:
+                    container_id = container_id[:12]
+            except WorkerRequestError:
+                if env.status != "error":
+                    env.status = "error"
+                    status_changed = True
+                container_id = None
+
+            env_dict = {
+                **env.__dict__,
+                "container_id": container_id,
+                "custom_ports": custom_ports_map.get(str(env.id), []),
+            }
+            env_dict.pop("_sa_instance_state", None)
+            env_responses.append(env_dict)
+            continue
 
         if docker_available and client is not None:
             try:
@@ -615,7 +832,7 @@ async def read_environments(skip: int = 0, limit: int = 100, db: AsyncSession = 
         env_dict.pop("_sa_instance_state", None)
         env_responses.append(env_dict)
 
-    if status_changed and docker_available:
+    if status_changed:
         await db.commit()
 
     return env_responses
@@ -627,6 +844,29 @@ async def read_environment(environment_id: str, db: AsyncSession = Depends(get_d
     env = result.scalars().first()
     if env is None:
         raise HTTPException(status_code=404, detail="Environment not found")
+
+    if env.worker_server_id:
+        worker = await _get_worker_server_by_id(db, env.worker_server_id)
+        if worker:
+            try:
+                remote_env = await call_worker_api(
+                    worker,
+                    method="GET",
+                    path=f"/api/worker/environments/{env.id}",
+                )
+                remote_status = str(remote_env.get("status") or env.status)
+                if env.status != remote_status:
+                    env.status = remote_status
+                    await db.commit()
+            except WorkerRequestError:
+                if env.status != "error":
+                    env.status = "error"
+                    await db.commit()
+        else:
+            if env.status != "error":
+                env.status = "error"
+                await db.commit()
+
     custom_ports = await _get_custom_ports_for_environment(db, str(env.id))
     env_dict = {**env.__dict__, "custom_ports": custom_ports}
     env_dict.pop("_sa_instance_state", None)
@@ -639,6 +879,17 @@ async def get_environment_logs(environment_id: str, db: AsyncSession = Depends(g
     env = result.scalars().first()
     if env is None:
         raise HTTPException(status_code=404, detail="Environment not found")
+
+    if env.worker_server_id:
+        worker = await _assert_worker_is_ready(db, env.worker_server_id)
+        try:
+            return await call_worker_api(
+                worker,
+                method="GET",
+                path=f"/api/worker/environments/{env.id}/logs",
+            )
+        except WorkerRequestError as error:
+            raise _map_worker_request_error(error) from error
 
     client = docker.from_env()
     container_name = f"lyra-{env.name}-{env.id}"
@@ -683,6 +934,41 @@ async def create_jupyter_launch_url(environment_id: str, db: AsyncSession = Depe
     if env.status != "running":
         raise HTTPException(status_code=409, detail="Environment must be running")
 
+    if env.worker_server_id:
+        worker = await _assert_worker_is_ready(db, env.worker_server_id)
+        try:
+            worker_launch = await call_worker_api(
+                worker,
+                method="POST",
+                path=f"/api/worker/environments/{env.id}/jupyter/launch",
+            )
+        except WorkerRequestError as error:
+            raise _map_worker_request_error(error) from error
+
+        remote_launch_path = str(worker_launch.get("launch_url") or "").strip()
+        if not remote_launch_path:
+            raise HTTPException(
+                status_code=502,
+                detail={"code": "worker_api_mismatch", "message": "Worker launch URL response is invalid"},
+            )
+        if remote_launch_path.startswith("http://") or remote_launch_path.startswith("https://"):
+            remote_launch_url = remote_launch_path
+        else:
+            base_url = str(worker.base_url or "").rstrip("/")
+            if not remote_launch_path.startswith("/"):
+                remote_launch_path = f"/{remote_launch_path}"
+            remote_launch_url = f"{base_url}{remote_launch_path}"
+
+        _cleanup_expired_jupyter_tickets()
+        launch_ticket = secrets.token_urlsafe(24)
+        jupyter_launch_tickets[launch_ticket] = {
+            "environment_id": str(env.id),
+            "expires_at": time.time() + JUPYTER_LAUNCH_TTL_SECONDS,
+            "used": False,
+            "remote_launch_url": remote_launch_url,
+        }
+        return {"launch_url": f"/api/environments/{environment_id}/jupyter/launch/{launch_ticket}"}
+
     token = await _get_jupyter_token(db, str(env.id))
     if not token:
         raise HTTPException(status_code=409, detail="Jupyter token is not configured. Recreate the environment.")
@@ -723,6 +1009,11 @@ async def launch_jupyter_with_ticket(
     if env.status != "running":
         raise HTTPException(status_code=409, detail="Environment must be running")
 
+    remote_launch_url = str(ticket_meta.get("remote_launch_url") or "").strip()
+    if env.worker_server_id and remote_launch_url:
+        ticket_meta["used"] = True
+        return RedirectResponse(url=remote_launch_url, status_code=307)
+
     token = await _get_jupyter_token(db, str(env.id))
     if not token:
         raise HTTPException(status_code=409, detail="Jupyter token is not configured. Recreate the environment.")
@@ -735,12 +1026,116 @@ async def launch_jupyter_with_ticket(
     return RedirectResponse(url=redirect_url, status_code=307)
 
 
+@router.post("/{environment_id}/code/launch")
+async def create_code_launch_url(environment_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Environment).where(Environment.id == environment_id))
+    env = result.scalars().first()
+    if env is None:
+        raise HTTPException(status_code=404, detail="Environment not found")
+    if not env.enable_code_server:
+        raise HTTPException(status_code=409, detail="code-server is disabled for this environment")
+    if env.status != "running":
+        raise HTTPException(status_code=409, detail="Environment must be running")
+
+    if env.worker_server_id:
+        worker = await _assert_worker_is_ready(db, env.worker_server_id)
+        try:
+            worker_launch = await call_worker_api(
+                worker,
+                method="POST",
+                path=f"/api/worker/environments/{env.id}/code/launch",
+            )
+        except WorkerRequestError as error:
+            raise _map_worker_request_error(error) from error
+
+        remote_launch_path = str(worker_launch.get("launch_url") or "").strip()
+        if not remote_launch_path:
+            raise HTTPException(
+                status_code=502,
+                detail={"code": "worker_api_mismatch", "message": "Worker launch URL response is invalid"},
+            )
+        if remote_launch_path.startswith("http://") or remote_launch_path.startswith("https://"):
+            remote_launch_url = remote_launch_path
+        else:
+            base_url = str(worker.base_url or "").rstrip("/")
+            if not remote_launch_path.startswith("/"):
+                remote_launch_path = f"/{remote_launch_path}"
+            remote_launch_url = f"{base_url}{remote_launch_path}"
+
+        _cleanup_expired_code_tickets()
+        launch_ticket = secrets.token_urlsafe(24)
+        code_launch_tickets[launch_ticket] = {
+            "environment_id": str(env.id),
+            "expires_at": time.time() + CODE_LAUNCH_TTL_SECONDS,
+            "used": False,
+            "remote_launch_url": remote_launch_url,
+        }
+        return {"launch_url": f"/api/environments/{environment_id}/code/launch/{launch_ticket}"}
+
+    _cleanup_expired_code_tickets()
+    launch_ticket = secrets.token_urlsafe(24)
+    code_launch_tickets[launch_ticket] = {
+        "environment_id": str(env.id),
+        "expires_at": time.time() + CODE_LAUNCH_TTL_SECONDS,
+        "used": False,
+    }
+    return {"launch_url": f"/api/environments/{environment_id}/code/launch/{launch_ticket}"}
+
+
+@router.get("/{environment_id}/code/launch/{launch_ticket}")
+async def launch_code_with_ticket(
+    environment_id: str, launch_ticket: str, request: Request, db: AsyncSession = Depends(get_db)
+):
+    _cleanup_expired_code_tickets()
+    ticket_meta = code_launch_tickets.get(launch_ticket)
+    if not ticket_meta:
+        raise HTTPException(status_code=404, detail="Launch ticket not found or expired")
+    if ticket_meta.get("used"):
+        raise HTTPException(status_code=410, detail="Launch ticket already used")
+    if ticket_meta.get("environment_id") != environment_id:
+        raise HTTPException(status_code=400, detail="Launch ticket does not match environment")
+    if float(ticket_meta.get("expires_at", 0)) < time.time():
+        code_launch_tickets.pop(launch_ticket, None)
+        raise HTTPException(status_code=410, detail="Launch ticket expired")
+
+    result = await db.execute(select(Environment).where(Environment.id == environment_id))
+    env = result.scalars().first()
+    if env is None:
+        raise HTTPException(status_code=404, detail="Environment not found")
+    if not env.enable_code_server:
+        raise HTTPException(status_code=409, detail="code-server is disabled for this environment")
+    if env.status != "running":
+        raise HTTPException(status_code=409, detail="Environment must be running")
+
+    remote_launch_url = str(ticket_meta.get("remote_launch_url") or "").strip()
+    if env.worker_server_id and remote_launch_url:
+        ticket_meta["used"] = True
+        return RedirectResponse(url=remote_launch_url, status_code=307)
+
+    ticket_meta["used"] = True
+    scheme = request.headers.get("x-forwarded-proto", request.url.scheme)
+    host = request.url.hostname or "localhost"
+    redirect_url = f"{scheme}://{host}:{env.code_port}"
+    return RedirectResponse(url=redirect_url, status_code=307)
+
+
 @router.delete("/{environment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_environment(environment_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Environment).where(Environment.id == environment_id))
     env = result.scalars().first()
     if env is None:
         raise HTTPException(status_code=404, detail="Environment not found")
+
+    if env.worker_server_id:
+        worker = await _assert_worker_is_ready(db, env.worker_server_id)
+        try:
+            await call_worker_api(
+                worker,
+                method="DELETE",
+                path=f"/api/worker/environments/{env.id}",
+            )
+        except WorkerRequestError as error:
+            raise _map_worker_request_error(error) from error
 
     # Try to remove container
     try:
@@ -769,6 +1164,7 @@ async def delete_environment(environment_id: str, db: AsyncSession = Depends(get
     await db.delete(env)
     await db.commit()
     _cleanup_expired_jupyter_tickets()
+    _cleanup_expired_code_tickets()
 
     return None
 
@@ -779,6 +1175,22 @@ async def start_environment(environment_id: str, db: AsyncSession = Depends(get_
     env = result.scalars().first()
     if env is None:
         raise HTTPException(status_code=404, detail="Environment not found")
+
+    if env.worker_server_id:
+        worker = await _assert_worker_is_ready(db, env.worker_server_id)
+        try:
+            response = await call_worker_api(
+                worker,
+                method="POST",
+                path=f"/api/worker/environments/{env.id}/start",
+            )
+            env.status = "running"
+            await db.commit()
+            return response
+        except WorkerRequestError as error:
+            env.status = "error"
+            await db.commit()
+            raise _map_worker_request_error(error) from error
 
     container_name = f"lyra-{env.name}-{env.id}"
     client = docker.from_env()
@@ -812,6 +1224,22 @@ async def stop_environment(environment_id: str, db: AsyncSession = Depends(get_d
     env = result.scalars().first()
     if env is None:
         raise HTTPException(status_code=404, detail="Environment not found")
+
+    if env.worker_server_id:
+        worker = await _assert_worker_is_ready(db, env.worker_server_id)
+        try:
+            response = await call_worker_api(
+                worker,
+                method="POST",
+                path=f"/api/worker/environments/{env.id}/stop",
+            )
+            env.status = "stopping"
+            await db.commit()
+            return response
+        except WorkerRequestError as error:
+            env.status = "error"
+            await db.commit()
+            raise _map_worker_request_error(error) from error
 
     container_name = f"lyra-{env.name}-{env.id}"
     client = docker.from_env()

@@ -40,6 +40,14 @@ class WorkerHealthResult:
     latency_ms: int | None = None
 
 
+class WorkerRequestError(RuntimeError):
+    def __init__(self, code: str, message: str, status_code: int = 503):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.status_code = status_code
+
+
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -80,6 +88,28 @@ async def _request_worker_health(base_url: str, api_token: str, timeout: float) 
     except Exception:
         payload = {}
     return response.status_code, payload
+
+
+async def _request_worker_json(
+    *,
+    base_url: str,
+    api_token: str,
+    method: str,
+    path: str,
+    timeout: float,
+    payload: dict[str, Any] | None = None,
+) -> tuple[int, dict[str, Any]]:
+    url = _build_worker_api_url(base_url, path)
+    headers = {"Authorization": f"Bearer {api_token}"}
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        response = await client.request(method=method.upper(), url=url, headers=headers, json=payload)
+
+    body: dict[str, Any] = {}
+    try:
+        body = response.json() if response.content else {}
+    except Exception:
+        body = {}
+    return response.status_code, body
 
 
 def build_worker_connection_config(worker: WorkerServer) -> WorkerConnectionConfig:
@@ -176,3 +206,52 @@ async def refresh_all_worker_health(db: AsyncSession) -> list[tuple[WorkerServer
         output.append((worker, health))
 
     return output
+
+
+async def call_worker_api(
+    worker: WorkerServer,
+    *,
+    method: str,
+    path: str,
+    payload: dict[str, Any] | None = None,
+    timeout: float | None = None,
+) -> dict[str, Any]:
+    try:
+        config = build_worker_connection_config(worker)
+    except (SecretCipherError, SecretKeyError) as error:
+        raise WorkerRequestError("worker_misconfigured", str(error), status_code=503) from error
+    except Exception as error:  # noqa: BLE001
+        raise WorkerRequestError("worker_misconfigured", f"Worker config error: {error}", status_code=503) from error
+
+    request_timeout = timeout if timeout is not None else _resolve_worker_timeout()
+    try:
+        http_status, body = await _request_worker_json(
+            base_url=config.base_url,
+            api_token=config.api_token,
+            method=method,
+            path=path,
+            timeout=request_timeout,
+            payload=payload,
+        )
+    except httpx.TimeoutException as error:
+        raise WorkerRequestError("worker_unreachable", "Worker request timed out", status_code=503) from error
+    except httpx.ConnectError as error:
+        raise WorkerRequestError("worker_unreachable", "Failed to connect to worker", status_code=503) from error
+    except httpx.HTTPError as error:
+        raise WorkerRequestError("worker_request_failed", f"Worker HTTP error: {error}", status_code=503) from error
+    except Exception as error:  # noqa: BLE001
+        raise WorkerRequestError("worker_request_failed", f"Worker request failed: {error}", status_code=503) from error
+
+    if http_status in {401, 403}:
+        raise WorkerRequestError("worker_auth_failed", "Worker authentication failed", status_code=502)
+    if http_status >= 400:
+        detail = ""
+        if isinstance(body, dict):
+            detail = str(body.get("detail") or body.get("message") or "").strip()
+        if not detail:
+            detail = f"Worker responded with status {http_status}"
+        raise WorkerRequestError("worker_request_failed", detail, status_code=502)
+    if not isinstance(body, dict):
+        raise WorkerRequestError("worker_api_mismatch", "Worker response payload is invalid", status_code=502)
+
+    return body
