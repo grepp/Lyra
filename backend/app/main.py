@@ -4,6 +4,7 @@ from .database import engine, Base
 from .routers import environments, terminal, resources, settings, templates, filesystem, worker_api, worker_servers
 from .models import Setting
 from .core.security import require_secret_key
+from .core.worker_auth import ensure_worker_api_token
 from sqlalchemy.future import select
 from contextlib import asynccontextmanager
 import os
@@ -11,6 +12,7 @@ import os
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    ensure_worker_api_token()
     require_secret_key()
 
     # Startup

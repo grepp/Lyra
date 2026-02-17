@@ -101,7 +101,11 @@ docker compose -f docker-compose.worker.gpu.yml up -d --build
 
 Worker node required env:
 - `LYRA_NODE_ROLE=worker`
-- `LYRA_WORKER_API_TOKEN=<shared token with main server>`
+
+Worker token policy:
+- When worker backend starts, Lyra generates a runtime worker API token and prints it in logs as plaintext.
+- Main server must use that token value when registering the worker server.
+- Token changes on worker restart.
 
 4. Verify containers:
 ```bash

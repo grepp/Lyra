@@ -45,7 +45,6 @@ services:
       - APP_SECRET_KEY=${APP_SECRET_KEY?APP_SECRET_KEY is required}
       - ALLOW_ORIGINS=${ALLOW_ORIGINS?ALLOW_ORIGINS is required}
       - LYRA_NODE_ROLE=worker
-      - LYRA_WORKER_API_TOKEN=${LYRA_WORKER_API_TOKEN?LYRA_WORKER_API_TOKEN is required}
       - SSH_HOST_KEY_POLICY=${SSH_HOST_KEY_POLICY?SSH_HOST_KEY_POLICY is required}
       - SSH_KNOWN_HOSTS_PATH=${SSH_KNOWN_HOSTS_PATH?SSH_KNOWN_HOSTS_PATH is required}
     depends_on:
@@ -68,7 +67,6 @@ services:
       - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND?CELERY_RESULT_BACKEND is required}
       - APP_SECRET_KEY=${APP_SECRET_KEY?APP_SECRET_KEY is required}
       - LYRA_NODE_ROLE=worker
-      - LYRA_WORKER_API_TOKEN=${LYRA_WORKER_API_TOKEN?LYRA_WORKER_API_TOKEN is required}
     depends_on:
       db:
         condition: service_healthy

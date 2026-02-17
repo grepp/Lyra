@@ -128,10 +128,10 @@ cp .env.sample .env
 2. Required worker env values:
 ```env
 LYRA_NODE_ROLE=worker
-LYRA_WORKER_API_TOKEN=REPLACE_WITH_LONG_RANDOM_TOKEN
 ```
 
 Keep DB/Redis/app values configured as in section 1.
+Worker backend generates API token at startup and prints it in logs as plaintext.
 
 3. Start worker stack (no frontend):
 ```bash
@@ -146,6 +146,11 @@ docker compose -f docker-compose.worker.gpu.yml up -d --build
 4. Verify worker API health from worker server:
 ```bash
 curl -H "Authorization: Bearer $LYRA_WORKER_API_TOKEN" http://127.0.0.1:8000/api/worker/health
+```
+
+Get token from worker backend logs:
+```bash
+docker compose -f docker-compose.worker.yml logs backend | rg "Token:"
 ```
 
 Expected:

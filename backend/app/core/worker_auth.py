@@ -1,14 +1,31 @@
 import os
+import secrets
 
 from fastapi import Header, HTTPException, status
 
 
 WORKER_ROLE = "worker"
 MAIN_ROLE = "main"
+_WORKER_RUNTIME_TOKEN: str | None = None
 
 
 def get_node_role() -> str:
     return os.getenv("LYRA_NODE_ROLE", MAIN_ROLE).strip().lower() or MAIN_ROLE
+
+
+def ensure_worker_api_token() -> str:
+    # Only worker nodes need this token.
+    if get_node_role() != WORKER_ROLE:
+        return ""
+
+    global _WORKER_RUNTIME_TOKEN
+    if _WORKER_RUNTIME_TOKEN:
+        return _WORKER_RUNTIME_TOKEN
+
+    _WORKER_RUNTIME_TOKEN = secrets.token_urlsafe(32)
+    print("[Lyra][Worker] Generated runtime worker API token.")
+    print(f"[Lyra][Worker] Token: {_WORKER_RUNTIME_TOKEN}")
+    return _WORKER_RUNTIME_TOKEN
 
 
 def require_worker_role() -> None:
@@ -30,7 +47,7 @@ def _extract_bearer_token(authorization: str | None) -> str:
 
 
 def require_worker_api_auth(authorization: str | None = Header(default=None)) -> None:
-    expected = os.getenv("LYRA_WORKER_API_TOKEN", "").strip()
+    expected = ensure_worker_api_token().strip()
     if not expected:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
