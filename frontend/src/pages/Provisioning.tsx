@@ -418,6 +418,12 @@ export default function Provisioning() {
   );
   // Error State
   const [errors, setErrors] = useState<{name?: string, password?: string, dockerfile?: string}>({});
+  const selectArrowStyle = {
+    backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 12 12%27 fill=%27none%27%3E%3Cpath d=%27M2.5 4.5L6 8L9.5 4.5%27 stroke=%27%236b7280%27 stroke-width=%271.5%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E")',
+    backgroundRepeat: 'no-repeat',
+    backgroundPosition: 'right 0.85rem center',
+    backgroundSize: '12px',
+  };
   const [modalConfig, setModalConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -764,7 +770,8 @@ export default function Provisioning() {
               <select
                 value={executionTarget}
                 onChange={(e) => setExecutionTarget(e.target.value)}
-                className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-[var(--text)] focus:outline-none focus:ring-1 focus:border-blue-500 focus:ring-blue-500"
+                className="w-full appearance-none pr-10 bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-[var(--text)] focus:outline-none focus:ring-1 focus:border-blue-500 focus:ring-blue-500"
+                style={selectArrowStyle}
               >
                 <option value="host">{t('provisioning.executionTargetHost')}</option>
                 {workerServers.map((worker) => (
