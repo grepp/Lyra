@@ -55,6 +55,7 @@ def _build_list_command(path: str) -> str:
     target = shlex.quote(path)
     return (
         f"TARGET={target}; "
+        "if [ -n \"${ZSH_VERSION:-}\" ]; then setopt nonomatch; fi; "
         "if [ ! -e \"$TARGET\" ]; then echo '__ERR__:NOT_FOUND'; exit 0; fi; "
         "if [ ! -d \"$TARGET\" ]; then echo '__ERR__:NOT_DIRECTORY'; exit 0; fi; "
         "if [ ! -r \"$TARGET\" ]; then echo '__ERR__:PERMISSION_DENIED'; exit 0; fi; "

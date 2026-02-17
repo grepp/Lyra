@@ -61,6 +61,11 @@ def test_normalize_host_path_validation_cases():
     assert fs_router._normalize_host_path("/tmp/../var//log") == "/var/log"
 
 
+def test_build_list_command_includes_zsh_nonomatch_guard():
+    command = fs_router._build_list_command("/")
+    assert 'if [ -n "${ZSH_VERSION:-}" ]; then setopt nonomatch; fi;' in command
+
+
 def test_list_host_directory_success_sorted_and_truncated(monkeypatch):
     output = "\n".join(
         [
