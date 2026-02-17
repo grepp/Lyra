@@ -97,6 +97,10 @@ const enCommon = {
     subtitle: 'Configure your GPU instance and build environment.',
     buildRun: 'Build & Run',
     basicConfiguration: 'Basic Configuration',
+    executionTarget: 'Execution Target',
+    executionTargetHost: 'Host Server',
+    executionTargetWorkerDescription: 'Provision on the selected worker server.',
+    executionTargetHostDescription: 'Provision on the current host server.',
     environmentName: 'Environment Name',
     environmentNamePlaceholder: 'e.g. llm-finetuning-v1',
     environmentNamePreview: 'Final name: {{value}}',
@@ -317,6 +321,7 @@ const enCommon = {
     provisioning: {
       allocateCustomPortFailed: 'Unable to allocate a custom port.',
       allocateGpuFailed: 'No allocatable GPU is available right now.',
+      loadTargetResourcesFailed: 'Failed to load target server resources.',
       invalidGpuSelection: 'Selected GPU indices are invalid.',
       creationFailedTitle: 'Creation Failed',
       creationFailedMessage: 'Failed to create environment. Check console for details.',

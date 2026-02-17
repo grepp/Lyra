@@ -4,7 +4,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from ..core.security import SecretCipherError, SecretKeyError, encrypt_secret
-from ..core.worker_registry import refresh_worker_health
+from ..core.worker_registry import (
+    WORKER_HEALTH_HEALTHY,
+    WorkerRequestError,
+    call_worker_api,
+    refresh_worker_health,
+)
 from ..database import get_db
 from ..models import Environment, WorkerServer
 from ..schemas import WorkerServerCreate, WorkerServerResponse, WorkerServerUpdate
@@ -29,6 +34,27 @@ def _is_unique_violation(error: IntegrityError, key: str) -> bool:
     if key == "base_url":
         return "uq_worker_servers_base_url" in text or ("duplicate key value" in text and "(base_url)" in text)
     return False
+
+
+async def _assert_worker_ready(db: AsyncSession, worker_id: str) -> WorkerServer:
+    result = await db.execute(select(WorkerServer).where(WorkerServer.id == worker_id))
+    worker = result.scalars().first()
+    if not worker:
+        raise HTTPException(status_code=404, detail={"code": "worker_not_found", "message": "Worker server not found"})
+    if not worker.is_active:
+        raise HTTPException(status_code=409, detail={"code": "worker_inactive", "message": "Worker server is inactive"})
+    health = await refresh_worker_health(db, worker)
+    await db.commit()
+    if health.status != WORKER_HEALTH_HEALTHY:
+        raise HTTPException(status_code=503, detail={"code": "worker_unreachable", "message": health.message})
+    return worker
+
+
+def _map_worker_request_error(error: WorkerRequestError) -> HTTPException:
+    return HTTPException(
+        status_code=error.status_code,
+        detail={"code": error.code, "message": error.message},
+    )
 
 
 @router.get("/", response_model=list[WorkerServerResponse])
@@ -181,6 +207,19 @@ async def check_worker_server_health(worker_id: str, db: AsyncSession = Depends(
     await db.commit()
     await db.refresh(worker)
     return worker
+
+
+@router.get("/{worker_id}/gpu")
+async def get_worker_gpu_resources(worker_id: str, db: AsyncSession = Depends(get_db)):
+    worker = await _assert_worker_ready(db, worker_id)
+    try:
+        return await call_worker_api(
+            worker,
+            method="GET",
+            path="/api/worker/gpu",
+        )
+    except WorkerRequestError as error:
+        raise _map_worker_request_error(error) from error
 
 
 @router.delete("/{worker_id}", status_code=status.HTTP_204_NO_CONTENT)

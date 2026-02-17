@@ -96,6 +96,10 @@ const koCommon = {
     subtitle: 'GPU 인스턴스와 빌드 환경을 설정합니다.',
     buildRun: '빌드 및 실행',
     basicConfiguration: '기본 설정',
+    executionTarget: '실행 대상',
+    executionTargetHost: '호스트 서버',
+    executionTargetWorkerDescription: '선택한 워커 서버에서 프로비저닝합니다.',
+    executionTargetHostDescription: '현재 호스트 서버에서 프로비저닝합니다.',
     environmentName: '환경 이름',
     environmentNamePlaceholder: '예: llm-finetuning-v1',
     environmentNamePreview: '최종 이름: {{value}}',
@@ -315,6 +319,7 @@ const koCommon = {
     provisioning: {
       allocateCustomPortFailed: '커스텀 포트를 할당할 수 없습니다.',
       allocateGpuFailed: '현재 할당 가능한 GPU가 없습니다.',
+      loadTargetResourcesFailed: '대상 서버 리소스를 불러오지 못했습니다.',
       invalidGpuSelection: '선택한 GPU 인덱스가 올바르지 않습니다.',
       creationFailedTitle: '생성 실패',
       creationFailedMessage: '환경 생성에 실패했습니다. 콘솔 로그를 확인해주세요.',

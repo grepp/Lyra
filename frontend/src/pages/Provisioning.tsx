@@ -2,7 +2,7 @@ import Editor from '@monaco-editor/react';
 import axios from 'axios';
 import clsx from 'clsx';
 import { Eye, EyeOff, FolderOpen, Loader2, Play, Plus, Save, Trash2, Upload } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import HostPathPickerModal from '../components/HostPathPickerModal';
@@ -33,6 +33,13 @@ interface EnvironmentSummary {
   name?: string;
   status?: string;
   gpu_indices?: number[];
+}
+
+interface WorkerServerOption {
+  id: string;
+  name: string;
+  is_active: boolean;
+  last_health_status?: string;
 }
 
 const MANAGED_JUPYTER_START = '# >>> LYRA_MANAGED_JUPYTER_START';
@@ -142,6 +149,8 @@ export default function Provisioning() {
   const [availableGpuIndices, setAvailableGpuIndices] = useState<number[]>([]);
   const [totalGpus, setTotalGpus] = useState(0);
   const [usedGpuCount, setUsedGpuCount] = useState(0);
+  const [executionTarget, setExecutionTarget] = useState<'host' | string>('host');
+  const [workerServers, setWorkerServers] = useState<WorkerServerOption[]>([]);
 
   const [mounts, setMounts] = useState<MountPoint[]>([]);
   const [hostPathPickerIndex, setHostPathPickerIndex] = useState<number | null>(null);
@@ -154,23 +163,48 @@ export default function Provisioning() {
   const [enableJupyter, setEnableJupyter] = useState(true);
   const [enableCodeServer, setEnableCodeServer] = useState(true);
 
-  // Fetch GPU Resources and Load Template
-  useEffect(() => {
-    axios.get('resources/gpu')
-      .then((gpuRes) => {
-        const total = Number(gpuRes.data?.total || 0);
-        const used = Number(gpuRes.data?.used || 0);
-        const availableIndices = Array.isArray(gpuRes.data?.available_indices)
-          ? gpuRes.data.available_indices.map((idx: number) => Number(idx)).filter((idx: number) => Number.isInteger(idx) && idx >= 0)
-          : [];
-        setTotalGpus(total);
-        setUsedGpuCount(used);
-        setAvailableGpuIndices(availableIndices);
-        setSelectedGpuIndices((prev) => prev.filter((idx) => availableIndices.includes(idx)));
-      })
-      .catch(err => console.error("Failed to fetch GPU resources", err));
+  const fetchGpuResources = useCallback(async (target: 'host' | string) => {
+    try {
+      const gpuRes = target === 'host'
+        ? await axios.get('resources/gpu')
+        : await axios.get(`worker-servers/${target}/gpu`);
+      const total = Number(gpuRes.data?.total || 0);
+      const used = Number(gpuRes.data?.used || 0);
+      const availableIndices = Array.isArray(gpuRes.data?.available_indices)
+        ? gpuRes.data.available_indices.map((idx: number) => Number(idx)).filter((idx: number) => Number.isInteger(idx) && idx >= 0)
+        : [];
+      setTotalGpus(total);
+      setUsedGpuCount(used);
+      setAvailableGpuIndices(availableIndices);
+      setSelectedGpuIndices((prev) => prev.filter((idx) => availableIndices.includes(idx)));
+    } catch (error) {
+      console.error('Failed to fetch GPU resources', error);
+      setTotalGpus(0);
+      setUsedGpuCount(0);
+      setAvailableGpuIndices([]);
+      setSelectedGpuIndices([]);
+      showToast(t('feedback.provisioning.loadTargetResourcesFailed'), 'error');
+    }
+  }, [showToast, t]);
 
-    // 2. Load Template if exists
+  const fetchWorkerServers = useCallback(async () => {
+    try {
+      const res = await axios.get('worker-servers/');
+      const workers = Array.isArray(res.data) ? (res.data as WorkerServerOption[]) : [];
+      const activeWorkers = workers.filter((worker) => worker.is_active);
+      setWorkerServers(activeWorkers);
+      if (executionTarget !== 'host' && !activeWorkers.some((worker) => worker.id === executionTarget)) {
+        setExecutionTarget('host');
+      }
+    } catch (error) {
+      console.error('Failed to fetch worker servers', error);
+      setWorkerServers([]);
+      if (executionTarget !== 'host') setExecutionTarget('host');
+    }
+  }, [executionTarget]);
+
+  // Load template if provided
+  useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const state = location.state as { templateConfig?: any };
     if (state && state.templateConfig) {
@@ -185,8 +219,15 @@ export default function Provisioning() {
       // Clear state so refresh doesn't reload template
       window.history.replaceState({}, document.title);
     }
-
   }, [location.state]);
+
+  useEffect(() => {
+    void fetchWorkerServers();
+  }, [fetchWorkerServers]);
+
+  useEffect(() => {
+    void fetchGpuResources(executionTarget);
+  }, [executionTarget, fetchGpuResources]);
 
   const handleAddGpuSelection = () => {
     const selectable = availableGpuIndices.filter((idx) => !selectedGpuIndices.includes(idx));
@@ -408,6 +449,7 @@ export default function Provisioning() {
 
     const payload = {
       name: prefixedName,
+      worker_server_id: executionTarget === 'host' ? null : executionTarget,
       container_user: 'root',
       root_password: password,
       mount_config: validMounts,
@@ -716,6 +758,27 @@ export default function Provisioning() {
               <span className="w-1 h-5 bg-blue-500 rounded-full"></span>
               {t('provisioning.basicConfiguration')}
             </h3>
+
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-[var(--text-muted)]">{t('provisioning.executionTarget')}</label>
+              <select
+                value={executionTarget}
+                onChange={(e) => setExecutionTarget(e.target.value)}
+                className="w-full bg-[var(--bg-soft)] border border-[var(--border)] rounded-lg px-4 py-2.5 text-[var(--text)] focus:outline-none focus:ring-1 focus:border-blue-500 focus:ring-blue-500"
+              >
+                <option value="host">{t('provisioning.executionTargetHost')}</option>
+                {workerServers.map((worker) => (
+                  <option key={worker.id} value={worker.id}>
+                    {worker.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-[var(--text-muted)]">
+                {executionTarget === 'host'
+                  ? t('provisioning.executionTargetHostDescription')
+                  : t('provisioning.executionTargetWorkerDescription')}
+              </p>
+            </div>
 
             <div className="space-y-1">
               <label className="text-sm font-medium text-[var(--text-muted)]">{t('provisioning.environmentName')}</label>
