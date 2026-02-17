@@ -121,7 +121,7 @@ const koCommon = {
     hostPathBrowseSelect: '이 디렉터리 선택',
     hostPathBrowseLoading: '디렉터리 불러오는 중...',
     hostPathBrowseNoDirectories: '이 경로에 하위 디렉터리가 없습니다.',
-    hostPathBrowseTruncated: '일부 항목만 표시 중입니다. 디렉터리 목록이 잘렸습니다.',
+    hostPathBrowseTruncated: '일부 항목만 표시 중입니다. 디렉터리 목록이 잘렸습니다. 상위 디렉터리를 선택하는 것을 권장합니다.',
     browse: '탐색',
     hostPathPlaceholder: '호스트 경로 (예: /home/user/data)',
     containerPathPlaceholder: '컨테이너 경로 (예: /data)',

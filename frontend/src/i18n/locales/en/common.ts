@@ -122,7 +122,7 @@ const enCommon = {
     hostPathBrowseSelect: 'Select This Directory',
     hostPathBrowseLoading: 'Loading directories...',
     hostPathBrowseNoDirectories: 'No subdirectories found in this path.',
-    hostPathBrowseTruncated: 'Some entries are hidden. Showing only part of the directory list.',
+    hostPathBrowseTruncated: 'Some entries are hidden. Showing only part of the directory list. Selecting a parent directory is recommended.',
     browse: 'Browse',
     hostPathPlaceholder: 'Host Path (e.g. /home/user/data)',
     containerPathPlaceholder: 'Container Path (e.g. /data)',
