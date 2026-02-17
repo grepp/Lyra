@@ -5,6 +5,7 @@ import { Eye, EyeOff, FolderOpen, Play, Plus, Save, Trash2, Upload } from 'lucid
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
+import HostPathPickerModal from '../components/HostPathPickerModal';
 import Modal from '../components/Modal';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
@@ -135,6 +136,7 @@ export default function Provisioning() {
   const [usedGpuCount, setUsedGpuCount] = useState(0);
 
   const [mounts, setMounts] = useState<MountPoint[]>([]);
+  const [hostPathPickerIndex, setHostPathPickerIndex] = useState<number | null>(null);
   const [customPorts, setCustomPorts] = useState<CustomPortMapping[]>([]);
   const [isAllocatingPort, setIsAllocatingPort] = useState(false);
   const [userDockerfile, setUserDockerfile] = useState('FROM python:3.11-slim\n');
@@ -205,6 +207,14 @@ export default function Provisioning() {
     // @ts-expect-error: indexing with dynamic field name
     newMounts[index][field] = value;
     setMounts(newMounts);
+  };
+
+  const handleOpenHostPathPicker = (index: number) => {
+    setHostPathPickerIndex(index);
+  };
+
+  const handleCloseHostPathPicker = () => {
+    setHostPathPickerIndex(null);
   };
 
   const handleAddCustomPort = async () => {
@@ -477,6 +487,16 @@ export default function Provisioning() {
           message={modalConfig.message}
           type={modalConfig.type}
       />
+      <HostPathPickerModal
+        isOpen={hostPathPickerIndex !== null}
+        onClose={handleCloseHostPathPicker}
+        initialPath={hostPathPickerIndex !== null ? mounts[hostPathPickerIndex]?.host_path : '/'}
+        onSelect={(selectedPath) => {
+          if (hostPathPickerIndex === null) return;
+          handleMountChange(hostPathPickerIndex, 'host_path', selectedPath);
+          handleCloseHostPathPicker();
+        }}
+      />
 
       {/* Save Template Modal */}
       {isSaveModalOpen && (
@@ -716,8 +736,15 @@ export default function Provisioning() {
                                 placeholder={t('provisioning.hostPathPlaceholder')}
                                 value={mount.host_path}
                                 onChange={(e) => handleMountChange(idx, 'host_path', e.target.value)}
-                                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2 pl-9 text-sm text-[var(--text)] focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all"
+                                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2 pl-9 pr-16 text-sm text-[var(--text)] focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all"
                             />
+                            <button
+                              type="button"
+                              onClick={() => handleOpenHostPathPicker(idx)}
+                              className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center rounded-md border border-[var(--border)] bg-[var(--bg-soft)] px-2 py-1 text-[10px] text-[var(--text)] hover:brightness-95 transition-colors"
+                            >
+                              {t('provisioning.browse')}
+                            </button>
                         </div>
                         <button
                             onClick={() => handleRemoveMount(idx)}
