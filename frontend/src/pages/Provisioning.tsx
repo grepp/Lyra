@@ -10,6 +10,7 @@ import Modal from '../components/Modal';
 import OverlayPortal from '../components/OverlayPortal';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
+import { decrypt } from '../utils/crypto';
 
 interface MountPoint {
   host_path: string;
@@ -143,6 +144,7 @@ export default function Provisioning() {
 
   const [mounts, setMounts] = useState<MountPoint[]>([]);
   const [hostPathPickerIndex, setHostPathPickerIndex] = useState<number | null>(null);
+  const [hostPathPickerPrivateKey, setHostPathPickerPrivateKey] = useState<string | undefined>(undefined);
   const [mountErrors, setMountErrors] = useState<Record<number, MountRowError>>({});
   const [checkingBrowseIndex, setCheckingBrowseIndex] = useState<number | null>(null);
   const [customPorts, setCustomPorts] = useState<CustomPortMapping[]>([]);
@@ -258,20 +260,50 @@ export default function Provisioning() {
     });
 
     try {
+      const fetchSettingValue = async (key: string): Promise<string> => {
+        try {
+          const res = await axios.get(`settings/${key}`);
+          return String(res.data?.value ?? '').trim();
+        } catch (error) {
+          if (axios.isAxiosError(error) && error.response?.status === 404) {
+            return '';
+          }
+          throw error;
+        }
+      };
+
       // Step 1: check required SSH settings exist.
-      const settingsRes = await axios.get('settings/');
-      const list = Array.isArray(settingsRes.data) ? settingsRes.data : [];
-      const settingMap = list.reduce<Record<string, string>>((acc, item) => {
-        if (item?.key) acc[item.key] = String(item.value || '');
-        return acc;
-      }, {});
-      const sshHost = settingMap.ssh_host?.trim() || '';
-      const sshPort = settingMap.ssh_port?.trim() || '';
-      const sshUser = settingMap.ssh_username?.trim() || '';
-      const authMethod = (settingMap.ssh_auth_method?.trim() || 'password').toLowerCase();
-      const sshPassword = settingMap.ssh_password?.trim() || '';
+      const [sshHost, sshPort, sshUser, authMethodRaw] = await Promise.all([
+        fetchSettingValue('ssh_host'),
+        fetchSettingValue('ssh_port'),
+        fetchSettingValue('ssh_username'),
+        fetchSettingValue('ssh_auth_method'),
+      ]);
+      const authMethod = (authMethodRaw || 'password').toLowerCase();
+      const sshPassword = authMethod === 'password' ? await fetchSettingValue('ssh_password') : '';
+      let browsePrivateKey: string | undefined;
+
+      if (authMethod === 'key') {
+        const encrypted = localStorage.getItem('ssh_private_key_encrypted') || '';
+        if (!encrypted) {
+          setMountError(index, t('provisioning.errorHostConnectionSettingsRequired'), true);
+          return;
+        }
+        const passphrase = window.prompt(t('provisioning.hostPathBrowsePassphrasePrompt'))?.trim() || '';
+        if (!passphrase) {
+          setMountError(index, t('provisioning.errorHostConnectionMasterPassphraseRequired'), true);
+          return;
+        }
+        try {
+          browsePrivateKey = await decrypt(encrypted, passphrase);
+        } catch {
+          setMountError(index, t('provisioning.errorHostConnectionAuthFailed'), true);
+          return;
+        }
+      }
+
       const hasBasic = Boolean(sshHost && sshPort && sshUser && authMethod);
-      const hasAuth = authMethod === 'password' ? Boolean(sshPassword) : true;
+      const hasAuth = authMethod === 'password' ? Boolean(sshPassword) : Boolean(browsePrivateKey);
       if (!hasBasic || !hasAuth) {
         setMountError(index, t('provisioning.errorHostConnectionSettingsRequired'), true);
         return;
@@ -279,8 +311,9 @@ export default function Provisioning() {
 
       // Step 2: verify real API connectivity before opening picker.
       const probePath = mounts[index]?.host_path?.trim() || '/';
-      const res = await axios.post('filesystem/host/list', { path: probePath });
+      const res = await axios.post('filesystem/host/list', { path: probePath, privateKey: browsePrivateKey });
       if (res.data?.status === 'success') {
+        setHostPathPickerPrivateKey(browsePrivateKey);
         setHostPathPickerIndex(index);
         return;
       }
@@ -302,6 +335,7 @@ export default function Provisioning() {
 
   const handleCloseHostPathPicker = () => {
     setHostPathPickerIndex(null);
+    setHostPathPickerPrivateKey(undefined);
   };
 
   const goToSettingsForSsh = () => {
@@ -582,6 +616,7 @@ export default function Provisioning() {
         isOpen={hostPathPickerIndex !== null}
         onClose={handleCloseHostPathPicker}
         initialPath={hostPathPickerIndex !== null ? mounts[hostPathPickerIndex]?.host_path : '/'}
+        privateKey={hostPathPickerPrivateKey}
         onSelect={(selectedPath) => {
           if (hostPathPickerIndex === null) return;
           handleMountChange(hostPathPickerIndex, 'host_path', selectedPath);

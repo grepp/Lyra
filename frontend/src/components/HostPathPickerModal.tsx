@@ -31,6 +31,7 @@ interface HostPathPickerModalProps {
   onClose: () => void;
   onSelect: (path: string) => void;
   initialPath?: string;
+  privateKey?: string;
 }
 
 const normalizePath = (value?: string): string => {
@@ -44,6 +45,7 @@ export default function HostPathPickerModal({
   onClose,
   onSelect,
   initialPath,
+  privateKey,
 }: HostPathPickerModalProps) {
   const { t } = useTranslation();
   const [currentPath, setCurrentPath] = useState('/');
@@ -76,7 +78,7 @@ export default function HostPathPickerModal({
     try {
       const res = await axios.post<HostPathListSuccessResponse | HostPathListErrorResponse>(
         'filesystem/host/list',
-        { path: normalized },
+        { path: normalized, privateKey },
         { signal: controller.signal }
       );
 
@@ -113,7 +115,7 @@ export default function HostPathPickerModal({
         setIsLoading(false);
       }
     }
-  }, []);
+  }, [privateKey]);
 
   useEffect(() => {
     if (!isOpen) return;
