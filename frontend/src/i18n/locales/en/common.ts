@@ -148,6 +148,7 @@ const enCommon = {
     hostPathBrowseErrorUnknown: 'Failed to validate host path browsing prerequisites.',
     errorHostConnectionSettingsRequired: 'Host SSH settings are required before browsing.',
     errorHostConnectionMasterPassphraseRequired: 'Master passphrase is required to decrypt the SSH key for browsing.',
+    errorHostConnectionMasterPassphraseInvalid: 'Failed to decrypt SSH key. Check your master passphrase.',
     errorHostConnectionAuthFailed: 'SSH authentication failed. Update credentials in Settings.',
     errorHostConnectionHostKeyFailed: 'Host key verification failed. Check fingerprint/known_hosts settings.',
     errorHostConnectionUnknown: 'Host connection validation failed. Please check SSH settings and retry.',

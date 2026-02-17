@@ -291,13 +291,13 @@ export default function Provisioning() {
         }
         const passphrase = window.prompt(t('provisioning.hostPathBrowsePassphrasePrompt'))?.trim() || '';
         if (!passphrase) {
-          setMountError(index, t('provisioning.errorHostConnectionMasterPassphraseRequired'), true);
+          setMountError(index, t('provisioning.errorHostConnectionMasterPassphraseRequired'), false);
           return;
         }
         try {
           browsePrivateKey = await decrypt(encrypted, passphrase);
         } catch {
-          setMountError(index, t('provisioning.errorHostConnectionAuthFailed'), true);
+          setMountError(index, t('provisioning.errorHostConnectionMasterPassphraseInvalid'), false);
           return;
         }
       }

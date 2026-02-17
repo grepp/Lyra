@@ -147,6 +147,7 @@ const koCommon = {
     hostPathBrowseErrorUnknown: '호스트 경로 탐색 사전 검증에 실패했습니다.',
     errorHostConnectionSettingsRequired: '탐색 전에 호스트 SSH 설정이 필요합니다.',
     errorHostConnectionMasterPassphraseRequired: '호스트 경로 탐색을 위해 SSH 키 복호화용 마스터 패스프레이즈가 필요합니다.',
+    errorHostConnectionMasterPassphraseInvalid: 'SSH 키 복호화에 실패했습니다. 마스터 패스프레이즈를 확인하세요.',
     errorHostConnectionAuthFailed: 'SSH 인증에 실패했습니다. 설정에서 인증 정보를 확인하세요.',
     errorHostConnectionHostKeyFailed: '호스트 키 검증에 실패했습니다. 지문/known_hosts 설정을 확인하세요.',
     errorHostConnectionUnknown: '호스트 연결 검증에 실패했습니다. SSH 설정을 확인한 뒤 다시 시도하세요.',
