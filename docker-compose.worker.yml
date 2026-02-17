@@ -36,6 +36,7 @@ services:
     volumes:
       - ./backend:/app
       - /var/run/docker.sock:/var/run/docker.sock
+      - worker_runtime_data:/var/lib/lyra/worker
     ports:
       - "8000:8000"
     environment:
@@ -76,3 +77,4 @@ services:
 
 volumes:
   worker_postgres_data:
+  worker_runtime_data:

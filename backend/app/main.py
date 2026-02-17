@@ -4,7 +4,7 @@ from .database import engine, Base
 from .routers import environments, terminal, resources, settings, templates, filesystem, worker_api, worker_servers
 from .models import Setting
 from .core.security import require_secret_key
-from .core.worker_auth import ensure_worker_api_token
+from .core.worker_auth import WORKER_ROLE, ensure_worker_api_token, get_node_role
 from sqlalchemy.future import select
 from contextlib import asynccontextmanager
 import os
@@ -57,11 +57,13 @@ def read_root():
     return {"message": "Welcome to Lyra API"}
 
 
-app.include_router(environments.router, prefix="/api")
-app.include_router(terminal.router, prefix="/api")
-app.include_router(resources.router, prefix="/api")
-app.include_router(settings.router, prefix="/api")
-app.include_router(templates.router, prefix="/api")
-app.include_router(filesystem.router, prefix="/api")
 app.include_router(worker_api.router, prefix="/api")
-app.include_router(worker_servers.router, prefix="/api")
+
+if get_node_role() != WORKER_ROLE:
+    app.include_router(environments.router, prefix="/api")
+    app.include_router(terminal.router, prefix="/api")
+    app.include_router(resources.router, prefix="/api")
+    app.include_router(settings.router, prefix="/api")
+    app.include_router(templates.router, prefix="/api")
+    app.include_router(filesystem.router, prefix="/api")
+    app.include_router(worker_servers.router, prefix="/api")

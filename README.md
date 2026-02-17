@@ -105,7 +105,8 @@ Worker node required env:
 Worker token policy:
 - When worker backend starts, Lyra generates a runtime worker API token and prints it in logs as plaintext.
 - Main server must use that token value when registering the worker server.
-- Token changes on worker restart.
+- Token is persisted in Docker named volume `worker_runtime_data` and reused across worker restarts.
+- If you remove `worker_runtime_data`, a new token is generated on next worker startup.
 
 4. Verify containers:
 ```bash

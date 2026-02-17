@@ -131,7 +131,7 @@ LYRA_NODE_ROLE=worker
 ```
 
 Keep DB/Redis/app values configured as in section 1.
-Worker backend generates API token at startup and prints it in logs as plaintext.
+Worker backend generates API token at startup, stores it in Docker named volume `worker_runtime_data`, and prints it in logs as plaintext.
 
 3. Start worker stack (no frontend):
 ```bash
@@ -145,7 +145,7 @@ docker compose -f docker-compose.worker.gpu.yml up -d --build
 
 4. Verify worker API health from worker server:
 ```bash
-curl -H "Authorization: Bearer $LYRA_WORKER_API_TOKEN" http://127.0.0.1:8000/api/worker/health
+curl -H "Authorization: Bearer <TOKEN_FROM_LOG>" http://127.0.0.1:8000/api/worker/health
 ```
 
 Get token from worker backend logs:
@@ -163,9 +163,10 @@ Expected:
 - Add:
   - Worker name
   - Worker base URL (e.g. `http://10.0.0.25:8000`)
-  - Same worker API token (`LYRA_WORKER_API_TOKEN`)
+  - Same worker API token (`TOKEN_FROM_LOG`)
 - Run health check in UI
 
 Notes:
 - Worker server must be reachable from main Lyra backend network path.
 - If the worker is unreachable, Dashboard marks its environments as `Error` and shows worker-specific reason via `?`.
+- If you intentionally rotate token, remove `worker_runtime_data` and restart worker backend, then update token on main server.

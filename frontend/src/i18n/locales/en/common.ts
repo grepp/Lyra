@@ -86,6 +86,7 @@ const enCommon = {
     noCustomPorts: 'No Custom Ports',
     copySshCommand: 'Copy SSH command (port: {{port}})',
     openInTerminal: 'Open in Terminal (port: {{port}})',
+    openInTerminalWorkerUnsupported: 'Direct SSH from dashboard is available only for host environments.',
     environmentMustBeRunning: 'Environment must be running (port: {{port}})',
     openJupyterLab: 'Open Jupyter Lab',
     openCodeServer: 'Open code-server',

@@ -277,6 +277,8 @@ export default function Dashboard() {
     const jupyterEnabled = env.enable_jupyter !== false;
     const codeEnabled = env.enable_code_server !== false;
 
+    const sshSupported = !env.worker_server_name;
+
     const accessItems: Array<{ key: string; node: ReactNode }> = [
       {
         key: 'ssh',
@@ -284,13 +286,15 @@ export default function Dashboard() {
           <div className="relative group">
             <button
               onClick={() => openEnvInTerminal(env)}
-              disabled={!isRunning}
+              disabled={!isRunning || !sshSupported}
               className="p-1 hover:bg-[var(--bg-soft)] rounded text-[var(--text-muted)] hover:text-blue-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <SquareTerminal size={14} />
             </button>
             <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-[var(--text)] opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
-              {isRunning
+              {!sshSupported
+                ? t('dashboard.openInTerminalWorkerUnsupported')
+                : isRunning
                 ? t('dashboard.openInTerminal', { port: env.ssh_port })
                 : t('dashboard.environmentMustBeRunning', { port: env.ssh_port })}
             </div>
