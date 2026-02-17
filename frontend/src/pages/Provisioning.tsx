@@ -1,7 +1,7 @@
 import Editor from '@monaco-editor/react';
 import axios from 'axios';
 import clsx from 'clsx';
-import { Eye, EyeOff, FolderOpen, Play, Plus, Save, Trash2, Upload } from 'lucide-react';
+import { Eye, EyeOff, FolderOpen, Loader2, Play, Plus, Save, Trash2, Upload } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -14,6 +14,11 @@ interface MountPoint {
   host_path: string;
   container_path: string;
   mode: 'rw' | 'ro';
+}
+
+interface MountRowError {
+  message: string;
+  showSettingsCta?: boolean;
 }
 
 interface CustomPortMapping {
@@ -137,6 +142,8 @@ export default function Provisioning() {
 
   const [mounts, setMounts] = useState<MountPoint[]>([]);
   const [hostPathPickerIndex, setHostPathPickerIndex] = useState<number | null>(null);
+  const [mountErrors, setMountErrors] = useState<Record<number, MountRowError>>({});
+  const [checkingBrowseIndex, setCheckingBrowseIndex] = useState<number | null>(null);
   const [customPorts, setCustomPorts] = useState<CustomPortMapping[]>([]);
   const [isAllocatingPort, setIsAllocatingPort] = useState(false);
   const [userDockerfile, setUserDockerfile] = useState('FROM python:3.11-slim\n');
@@ -200,6 +207,15 @@ export default function Provisioning() {
 
   const handleRemoveMount = (index: number) => {
     setMounts(mounts.filter((_, i) => i !== index));
+    setMountErrors((prev) => {
+      const next: Record<number, MountRowError> = {};
+      Object.entries(prev).forEach(([key, value]) => {
+        const idx = Number(key);
+        if (idx < index) next[idx] = value;
+        if (idx > index) next[idx - 1] = value;
+      });
+      return next;
+    });
   };
 
   const handleMountChange = (index: number, field: keyof MountPoint, value: string) => {
@@ -207,14 +223,88 @@ export default function Provisioning() {
     // @ts-expect-error: indexing with dynamic field name
     newMounts[index][field] = value;
     setMounts(newMounts);
+    if (field === 'host_path') {
+      setMountErrors((prev) => {
+        if (!prev[index]) return prev;
+        const next = { ...prev };
+        delete next[index];
+        return next;
+      });
+    }
   };
 
-  const handleOpenHostPathPicker = (index: number) => {
-    setHostPathPickerIndex(index);
+  const setMountError = (index: number, message: string, showSettingsCta = false) => {
+    setMountErrors((prev) => ({ ...prev, [index]: { message, showSettingsCta } }));
+  };
+
+  const getBrowseErrorMessage = (code?: string, fallbackMessage?: string) => {
+    if (code === 'ssh_not_configured') return { message: t('provisioning.hostPathBrowseErrorSettingsRequired'), settings: true };
+    if (code === 'ssh_auth_failed') return { message: t('provisioning.hostPathBrowseErrorAuthFailed'), settings: true };
+    if (code === 'ssh_host_key_failed') return { message: t('provisioning.hostPathBrowseErrorHostKeyFailed'), settings: true };
+    if (code === 'permission_denied') return { message: t('provisioning.hostPathBrowseErrorPermissionDenied'), settings: false };
+    if (code === 'path_not_found') return { message: t('provisioning.hostPathBrowseErrorPathNotFound'), settings: false };
+    return { message: fallbackMessage || t('provisioning.hostPathBrowseErrorUnknown'), settings: false };
+  };
+
+  const handleOpenHostPathPicker = async (index: number) => {
+    if (checkingBrowseIndex !== null) return;
+    setCheckingBrowseIndex(index);
+    setMountErrors((prev) => {
+      if (!prev[index]) return prev;
+      const next = { ...prev };
+      delete next[index];
+      return next;
+    });
+
+    try {
+      // Step 1: check required SSH settings exist.
+      const settingsRes = await axios.get('settings/');
+      const list = Array.isArray(settingsRes.data) ? settingsRes.data : [];
+      const settingMap = list.reduce<Record<string, string>>((acc, item) => {
+        if (item?.key) acc[item.key] = String(item.value || '');
+        return acc;
+      }, {});
+      const sshHost = settingMap.ssh_host?.trim() || '';
+      const sshPort = settingMap.ssh_port?.trim() || '';
+      const sshUser = settingMap.ssh_username?.trim() || '';
+      const authMethod = (settingMap.ssh_auth_method?.trim() || 'password').toLowerCase();
+      const sshPassword = settingMap.ssh_password?.trim() || '';
+      const hasBasic = Boolean(sshHost && sshPort && sshUser && authMethod);
+      const hasAuth = authMethod === 'password' ? Boolean(sshPassword) : true;
+      if (!hasBasic || !hasAuth) {
+        setMountError(index, t('provisioning.hostPathBrowseErrorSettingsRequired'), true);
+        return;
+      }
+
+      // Step 2: verify real API connectivity before opening picker.
+      const probePath = mounts[index]?.host_path?.trim() || '/';
+      const res = await axios.post('filesystem/host/list', { path: probePath });
+      if (res.data?.status === 'success') {
+        setHostPathPickerIndex(index);
+        return;
+      }
+      const mapped = getBrowseErrorMessage(res.data?.code, res.data?.message);
+      setMountError(index, mapped.message, mapped.settings);
+    } catch (error) {
+      let code = '';
+      let message = '';
+      if (axios.isAxiosError(error)) {
+        code = String(error.response?.data?.code || '');
+        message = String(error.response?.data?.message || error.message || '');
+      }
+      const mapped = getBrowseErrorMessage(code, message);
+      setMountError(index, mapped.message, mapped.settings);
+    } finally {
+      setCheckingBrowseIndex(null);
+    }
   };
 
   const handleCloseHostPathPicker = () => {
     setHostPathPickerIndex(null);
+  };
+
+  const goToSettingsForSsh = () => {
+    navigate('/settings');
   };
 
   const handleAddCustomPort = async () => {
@@ -740,9 +830,11 @@ export default function Provisioning() {
                             />
                             <button
                               type="button"
-                              onClick={() => handleOpenHostPathPicker(idx)}
-                              className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center rounded-md border border-[var(--border)] bg-[var(--bg-soft)] px-2 py-1 text-[10px] text-[var(--text)] hover:brightness-95 transition-colors"
+                              onClick={() => { void handleOpenHostPathPicker(idx); }}
+                              disabled={checkingBrowseIndex !== null}
+                              className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--bg-soft)] px-2 py-1 text-[10px] text-[var(--text)] hover:brightness-95 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                             >
+                              {checkingBrowseIndex === idx ? <Loader2 size={10} className="animate-spin" /> : null}
                               {t('provisioning.browse')}
                             </button>
                         </div>
@@ -777,6 +869,20 @@ export default function Provisioning() {
                             </select>
                         </div>
                     </div>
+                    {mountErrors[idx] && (
+                      <div className="mt-1 flex items-center gap-2">
+                        <p className="text-xs text-red-400">{mountErrors[idx].message}</p>
+                        {mountErrors[idx].showSettingsCta && (
+                          <button
+                            type="button"
+                            onClick={goToSettingsForSsh}
+                            className="text-xs text-red-300 underline underline-offset-2 hover:text-red-200 transition-colors"
+                          >
+                            {t('provisioning.goToSettings')}
+                          </button>
+                        )}
+                      </div>
+                    )}
                 </div>
               ))}
               {mounts.length === 0 && (
