@@ -71,12 +71,21 @@ const getInitialActiveTabId = (tabs: TerminalTab[]): string => {
   return tabs.some((tab) => tab.id === stored) ? stored : tabs[0]?.id ?? 'terminal-tab-1';
 };
 
-const getSmallestAvailableTabNumber = (tabs: TerminalTab[]): number => {
-  const used = new Set(
-    tabs
-      .map((tab) => Number(tab.number))
-      .filter((n) => Number.isInteger(n) && n > 0),
-  );
+const getSmallestAvailableTabSlot = (tabs: TerminalTab[]): number => {
+  const used = new Set<number>();
+  tabs.forEach((tab) => {
+    const numberValue = Number(tab.number);
+    if (Number.isInteger(numberValue) && numberValue > 0) {
+      used.add(numberValue);
+    }
+    const match = String(tab.id).match(/^terminal-tab-(\d+)$/);
+    if (match) {
+      const idValue = Number(match[1]);
+      if (Number.isInteger(idValue) && idValue > 0) {
+        used.add(idValue);
+      }
+    }
+  });
   let next = 1;
   while (used.has(next)) next += 1;
   return next;
@@ -94,7 +103,6 @@ export default function TerminalPage() {
   const [authMethod, setAuthMethod] = useState<string | null>(null);
   const [tabs, setTabs] = useState<TerminalTab[]>(getInitialTabs);
   const [activeTabId, setActiveTabId] = useState<string>(() => getInitialActiveTabId(getInitialTabs()));
-  const tabIdCounterRef = useRef(1);
   const decryptedPrivateKeyRef = useRef<string | null>(null);
   const pendingTabCommandsRef = useRef<Record<string, string>>({});
   const terminalMessagesRef = useRef({
@@ -124,21 +132,10 @@ export default function TerminalPage() {
     }
   }, [tabs, activeTabId]);
 
-  useEffect(() => {
-    if (tabs.length === 0) return;
-    const maxId = tabs.reduce((max, tab) => {
-      const match = tab.id.match(/^terminal-tab-(\d+)$/);
-      if (!match) return max;
-      const value = Number(match[1]);
-      return Number.isFinite(value) ? Math.max(max, value) : max;
-    }, 1);
-    tabIdCounterRef.current = Math.max(1, maxId);
-  }, [tabs]);
-
   const createTab = useCallback((options?: { initialCommand?: string; titlePrefix?: string }) => {
-    tabIdCounterRef.current += 1;
-    const nextId = `terminal-tab-${tabIdCounterRef.current}`;
-    const nextNumber = getSmallestAvailableTabNumber(tabs);
+    const nextSlot = getSmallestAvailableTabSlot(tabs);
+    const nextId = `terminal-tab-${nextSlot}`;
+    const nextNumber = nextSlot;
     if (options?.initialCommand) {
       pendingTabCommandsRef.current[nextId] = options.initialCommand;
     }
@@ -183,9 +180,12 @@ export default function TerminalPage() {
       const action = JSON.parse(raw) as { type?: string; command?: string; environmentName?: string };
       window.localStorage.removeItem(TERMINAL_ACTION_QUEUE_KEY);
       if (action.type === 'open_tab_and_run' && typeof action.command === 'string' && action.command.trim()) {
-        createTab({
-          initialCommand: action.command.trim(),
-          titlePrefix: typeof action.environmentName === 'string' ? action.environmentName : undefined,
+        const command = action.command.trim();
+        window.requestAnimationFrame(() => {
+          createTab({
+            initialCommand: command,
+            titlePrefix: typeof action.environmentName === 'string' ? action.environmentName : undefined,
+          });
         });
       }
     } catch {
