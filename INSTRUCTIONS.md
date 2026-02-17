@@ -115,3 +115,52 @@ Performance note:
 - [ ] Permission denied path -> inline path error
 - [ ] Non-existent path -> inline path error
 - [ ] Large directory -> truncated notice shown
+
+## 8) Worker node deployment (separate server)
+
+Use this when you want to register an additional worker server from the main Lyra instance.
+
+1. Prepare env:
+```bash
+cp .env.sample .env
+```
+
+2. Required worker env values:
+```env
+LYRA_NODE_ROLE=worker
+LYRA_WORKER_API_TOKEN=REPLACE_WITH_LONG_RANDOM_TOKEN
+```
+
+Keep DB/Redis/app values configured as in section 1.
+
+3. Start worker stack (no frontend):
+```bash
+docker compose -f docker-compose.worker.yml up -d --build
+```
+
+GPU worker host:
+```bash
+docker compose -f docker-compose.worker.gpu.yml up -d --build
+```
+
+4. Verify worker API health from worker server:
+```bash
+curl -H "Authorization: Bearer $LYRA_WORKER_API_TOKEN" http://127.0.0.1:8000/api/worker/health
+```
+
+Expected:
+```json
+{"status":"ok","role":"worker"}
+```
+
+5. Register worker on main Lyra:
+- Go to `Settings > Worker Servers`
+- Add:
+  - Worker name
+  - Worker base URL (e.g. `http://10.0.0.25:8000`)
+  - Same worker API token (`LYRA_WORKER_API_TOKEN`)
+- Run health check in UI
+
+Notes:
+- Worker server must be reachable from main Lyra backend network path.
+- If the worker is unreachable, Dashboard marks its environments as `Error` and shows worker-specific reason via `?`.

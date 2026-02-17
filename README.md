@@ -36,6 +36,16 @@ docker-compose up -d --build
 docker-compose -f docker-compose.gpu.yml up -d --build
 ```
 
+**Worker Node Only (no frontend):**
+```bash
+docker compose -f docker-compose.worker.yml up -d --build
+```
+
+**Worker Node Only + GPU:**
+```bash
+docker compose -f docker-compose.worker.gpu.yml up -d --build
+```
+
 - **Frontend**: [http://localhost](http://localhost)
 - **Backend API**: [http://localhost:8000](http://localhost:8000)
 - **API Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
@@ -82,6 +92,17 @@ GPU hosts:
 docker compose -f docker-compose.gpu.yml up -d --build
 ```
 
+Worker-only hosts:
+```bash
+docker compose -f docker-compose.worker.yml up -d --build
+# or (GPU)
+docker compose -f docker-compose.worker.gpu.yml up -d --build
+```
+
+Worker node required env:
+- `LYRA_NODE_ROLE=worker`
+- `LYRA_WORKER_API_TOKEN=<shared token with main server>`
+
 4. Verify containers:
 ```bash
 docker compose ps
@@ -104,6 +125,7 @@ docker compose ps
 ├── .github/workflows/     # GitHub Actions CI/CD pipelines
 ├── .pre-commit-config.yaml# Local CI check configuration
 └── docker-compose.yml     # Service orchestration
+└── docker-compose.worker.yml / docker-compose.worker.gpu.yml # Worker-only deployment
 ```
 
 ---
