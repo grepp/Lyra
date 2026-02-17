@@ -73,6 +73,7 @@ def test_list_host_directory_success_sorted_and_truncated(monkeypatch):
             "z-file\t/tmp/work/z-file\tf\t1\t0",
             "a-dir\t/tmp/work/a-dir\td\t1\t1",
             "b-dir\t/tmp/work/b-dir\td\t1\t0",
+            "c-dir\t/tmp/work/c-dir\td\t1\t1",
         ]
     )
     ssh_client = _FakeSshClient(out=output)

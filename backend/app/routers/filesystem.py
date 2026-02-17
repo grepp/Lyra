@@ -65,7 +65,8 @@ def _build_list_command(path: str) -> str:
         "for ITEM in \"$RESOLVED\"/* \"$RESOLVED\"/.[!.]* \"$RESOLVED\"/..?*; do "
         "[ -e \"$ITEM\" ] || continue; "
         "NAME=$(basename \"$ITEM\"); "
-        "if [ -d \"$ITEM\" ]; then TYPE='d'; else TYPE='f'; fi; "
+        "if [ ! -d \"$ITEM\" ]; then continue; fi; "
+        "TYPE='d'; "
         "if [ -r \"$ITEM\" ]; then R='1'; else R='0'; fi; "
         "if [ -w \"$ITEM\" ]; then W='1'; else W='0'; fi; "
         "printf '%s\\t%s\\t%s\\t%s\\t%s\\n' \"$NAME\" \"$ITEM\" \"$TYPE\" \"$R\" \"$W\"; "
@@ -121,6 +122,8 @@ async def list_host_directory(req: HostFsListRequest, db: AsyncSession = Depends
             if len(parts) < 5:
                 continue
             name, entry_path, entry_type, readable, writable = parts[:5]
+            if entry_type != "d":
+                continue
             entries_raw.append(
                 {
                     "name": name,
