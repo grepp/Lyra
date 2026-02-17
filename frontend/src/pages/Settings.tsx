@@ -591,8 +591,8 @@ export default function Settings() {
             <p className="mt-1 text-sm text-[var(--text-muted)]">{t('settings.generalDescription')}</p>
           </div>
 
-          <form onSubmit={handleSaveName} className="p-6 space-y-4">
-            <div>
+          <div className="p-6 space-y-4">
+            <form onSubmit={handleSaveName} className="space-y-0">
               <label htmlFor="appName" className="mb-2 block text-sm font-medium text-[var(--text-muted)]">{t('settings.applicationName')}</label>
               <div className="flex gap-4">
                 <input
@@ -605,8 +605,8 @@ export default function Settings() {
                 />
                 <button type="submit" disabled={isLoading} className={`${primaryButtonClass} px-6 font-medium flex items-center gap-2`}><Save size={18} />{t('actions.save')}</button>
               </div>
-            </div>
-            <div>
+            </form>
+            <form onSubmit={handleSaveUserName} className="space-y-0">
               <label htmlFor="userName" className="mb-2 block text-sm font-medium text-[var(--text-muted)]">{t('settings.userName')}</label>
               <div className="flex gap-4">
                 <input
@@ -619,16 +619,15 @@ export default function Settings() {
                   className={`flex-1 ${inputClass}`}
                 />
                 <button
-                  type="button"
+                  type="submit"
                   disabled={isLoading}
-                  onClick={handleSaveUserName}
                   className={`${primaryButtonClass} px-6 font-medium flex items-center gap-2`}
                 >
                   <Save size={18} />
                   {t('actions.save')}
                 </button>
               </div>
-            </div>
+            </form>
 
             <div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -776,7 +775,7 @@ export default function Settings() {
                 <span className="font-medium">{announcementStatus.message}</span>
               </div>
             )}
-          </form>
+          </div>
         </section>
 
         {/* SSH Connection Section */}

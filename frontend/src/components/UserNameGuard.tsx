@@ -2,7 +2,7 @@ import { type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Modal from './Modal';
-import { hasStoredUserName } from '../utils/userIdentity';
+import { getStoredUserName, validateUserName } from '../utils/userIdentity';
 
 interface UserNameGuardProps {
   children: ReactNode;
@@ -11,8 +11,9 @@ interface UserNameGuardProps {
 export default function UserNameGuard({ children }: UserNameGuardProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const userNameValidation = validateUserName(getStoredUserName());
 
-  if (hasStoredUserName()) {
+  if (userNameValidation.code === 'ok') {
     return <>{children}</>;
   }
 
