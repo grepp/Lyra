@@ -1,18 +1,26 @@
 import Editor from '@monaco-editor/react';
 import axios from 'axios';
 import clsx from 'clsx';
-import { Eye, EyeOff, FolderOpen, Play, Plus, Save, Trash2, Upload } from 'lucide-react';
+import { Eye, EyeOff, FolderOpen, Loader2, Play, Plus, Save, Trash2, Upload } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
+import HostPathPickerModal from '../components/HostPathPickerModal';
 import Modal from '../components/Modal';
+import OverlayPortal from '../components/OverlayPortal';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
+import { decrypt } from '../utils/crypto';
 
 interface MountPoint {
   host_path: string;
   container_path: string;
   mode: 'rw' | 'ro';
+}
+
+interface MountRowError {
+  message: string;
+  showSettingsCta?: boolean;
 }
 
 interface CustomPortMapping {
@@ -135,6 +143,10 @@ export default function Provisioning() {
   const [usedGpuCount, setUsedGpuCount] = useState(0);
 
   const [mounts, setMounts] = useState<MountPoint[]>([]);
+  const [hostPathPickerIndex, setHostPathPickerIndex] = useState<number | null>(null);
+  const [hostPathPickerPrivateKey, setHostPathPickerPrivateKey] = useState<string | undefined>(undefined);
+  const [mountErrors, setMountErrors] = useState<Record<number, MountRowError>>({});
+  const [checkingBrowseIndex, setCheckingBrowseIndex] = useState<number | null>(null);
   const [customPorts, setCustomPorts] = useState<CustomPortMapping[]>([]);
   const [isAllocatingPort, setIsAllocatingPort] = useState(false);
   const [userDockerfile, setUserDockerfile] = useState('FROM python:3.11-slim\n');
@@ -198,6 +210,15 @@ export default function Provisioning() {
 
   const handleRemoveMount = (index: number) => {
     setMounts(mounts.filter((_, i) => i !== index));
+    setMountErrors((prev) => {
+      const next: Record<number, MountRowError> = {};
+      Object.entries(prev).forEach(([key, value]) => {
+        const idx = Number(key);
+        if (idx < index) next[idx] = value;
+        if (idx > index) next[idx - 1] = value;
+      });
+      return next;
+    });
   };
 
   const handleMountChange = (index: number, field: keyof MountPoint, value: string) => {
@@ -205,6 +226,120 @@ export default function Provisioning() {
     // @ts-expect-error: indexing with dynamic field name
     newMounts[index][field] = value;
     setMounts(newMounts);
+    if (field === 'host_path') {
+      setMountErrors((prev) => {
+        if (!prev[index]) return prev;
+        const next = { ...prev };
+        delete next[index];
+        return next;
+      });
+    }
+  };
+
+  const setMountError = (index: number, message: string, showSettingsCta = false) => {
+    setMountErrors((prev) => ({ ...prev, [index]: { message, showSettingsCta } }));
+  };
+
+  const getBrowseErrorMessage = (code?: string, fallbackMessage?: string) => {
+    if (code === 'ssh_not_configured') return { message: t('provisioning.errorHostConnectionSettingsRequired'), settings: true };
+    if (code === 'ssh_auth_failed') return { message: t('provisioning.errorHostConnectionAuthFailed'), settings: true };
+    if (code === 'ssh_host_key_failed') return { message: t('provisioning.errorHostConnectionHostKeyFailed'), settings: true };
+    if (code === 'permission_denied') return { message: t('provisioning.errorHostPathPermissionDenied'), settings: false };
+    if (code === 'path_not_found') return { message: t('provisioning.errorHostPathNotFound'), settings: false };
+    return { message: fallbackMessage || t('provisioning.errorHostConnectionUnknown'), settings: false };
+  };
+
+  const handleOpenHostPathPicker = async (index: number) => {
+    if (checkingBrowseIndex !== null) return;
+    setCheckingBrowseIndex(index);
+    setMountErrors((prev) => {
+      if (!prev[index]) return prev;
+      const next = { ...prev };
+      delete next[index];
+      return next;
+    });
+
+    try {
+      const fetchSettingValue = async (key: string): Promise<string> => {
+        try {
+          const res = await axios.get(`settings/${key}`);
+          return String(res.data?.value ?? '').trim();
+        } catch (error) {
+          if (axios.isAxiosError(error) && error.response?.status === 404) {
+            return '';
+          }
+          throw error;
+        }
+      };
+
+      // Step 1: check required SSH settings exist.
+      const [sshHost, sshUser, authMethodRaw] = await Promise.all([
+        fetchSettingValue('ssh_host'),
+        fetchSettingValue('ssh_username'),
+        fetchSettingValue('ssh_auth_method'),
+      ]);
+      const authMethod = (authMethodRaw || 'password').toLowerCase();
+      const sshPassword = authMethod === 'password' ? await fetchSettingValue('ssh_password') : '';
+      let browsePrivateKey: string | undefined;
+
+      if (authMethod === 'key') {
+        const encrypted = localStorage.getItem('ssh_private_key_encrypted') || '';
+        if (!encrypted) {
+          setMountError(index, t('provisioning.errorHostConnectionSettingsRequired'), true);
+          return;
+        }
+        const passphrase = window.prompt(t('provisioning.hostPathBrowsePassphrasePrompt'))?.trim() || '';
+        if (!passphrase) {
+          setMountError(index, t('provisioning.errorHostConnectionMasterPassphraseRequired'), false);
+          return;
+        }
+        try {
+          browsePrivateKey = await decrypt(encrypted, passphrase);
+        } catch {
+          setMountError(index, t('provisioning.errorHostConnectionMasterPassphraseInvalid'), false);
+          return;
+        }
+      }
+
+      // Backend defaults missing ssh_port to 22, so port is not required in frontend precheck.
+      const hasBasic = Boolean(sshHost && sshUser && authMethod);
+      const hasAuth = authMethod === 'password' ? Boolean(sshPassword) : Boolean(browsePrivateKey);
+      if (!hasBasic || !hasAuth) {
+        setMountError(index, t('provisioning.errorHostConnectionSettingsRequired'), true);
+        return;
+      }
+
+      // Step 2: verify real API connectivity before opening picker.
+      const probePath = mounts[index]?.host_path?.trim() || '/';
+      const res = await axios.post('filesystem/host/list', { path: probePath, privateKey: browsePrivateKey });
+      if (res.data?.status === 'success') {
+        setHostPathPickerPrivateKey(browsePrivateKey);
+        setHostPathPickerIndex(index);
+        return;
+      }
+      const mapped = getBrowseErrorMessage(res.data?.code, res.data?.message);
+      setMountError(index, mapped.message, mapped.settings);
+    } catch (error) {
+      let code = '';
+      let message = '';
+      if (axios.isAxiosError(error)) {
+        code = String(error.response?.data?.code || '');
+        message = String(error.response?.data?.message || error.message || '');
+      }
+      const mapped = getBrowseErrorMessage(code, message);
+      setMountError(index, mapped.message, mapped.settings);
+    } finally {
+      setCheckingBrowseIndex(null);
+    }
+  };
+
+  const handleCloseHostPathPicker = () => {
+    setHostPathPickerIndex(null);
+    setHostPathPickerPrivateKey(undefined);
+  };
+
+  const goToSettingsForSsh = () => {
+    navigate('/settings');
   };
 
   const handleAddCustomPort = async () => {
@@ -477,10 +612,21 @@ export default function Provisioning() {
           message={modalConfig.message}
           type={modalConfig.type}
       />
+      <HostPathPickerModal
+        isOpen={hostPathPickerIndex !== null}
+        onClose={handleCloseHostPathPicker}
+        initialPath={hostPathPickerIndex !== null ? mounts[hostPathPickerIndex]?.host_path : '/'}
+        privateKey={hostPathPickerPrivateKey}
+        onSelect={(selectedPath) => {
+          if (hostPathPickerIndex === null) return;
+          handleMountChange(hostPathPickerIndex, 'host_path', selectedPath);
+          handleCloseHostPathPicker();
+        }}
+      />
 
       {/* Save Template Modal */}
       {isSaveModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] backdrop-blur-sm">
+        <OverlayPortal>
             <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
                 <div className="p-6 space-y-4">
                     <h3 className="text-xl font-bold text-[var(--text)]">{t('provisioning.saveAsTemplate')}</h3>
@@ -534,7 +680,7 @@ export default function Provisioning() {
                     </button>
                 </div>
             </div>
-        </div>
+        </OverlayPortal>
       )}
 
       <header className="flex justify-between items-center">
@@ -716,8 +862,17 @@ export default function Provisioning() {
                                 placeholder={t('provisioning.hostPathPlaceholder')}
                                 value={mount.host_path}
                                 onChange={(e) => handleMountChange(idx, 'host_path', e.target.value)}
-                                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2 pl-9 text-sm text-[var(--text)] focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all"
+                                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2 pl-9 pr-16 text-sm text-[var(--text)] focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all"
                             />
+                            <button
+                              type="button"
+                              onClick={() => { void handleOpenHostPathPicker(idx); }}
+                              disabled={checkingBrowseIndex !== null}
+                              className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--bg-soft)] px-2 py-1 text-[10px] text-[var(--text)] hover:brightness-95 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                              {checkingBrowseIndex === idx ? <Loader2 size={10} className="animate-spin" /> : null}
+                              {t('provisioning.hostPathBrowseButton')}
+                            </button>
                         </div>
                         <button
                             onClick={() => handleRemoveMount(idx)}
@@ -750,6 +905,20 @@ export default function Provisioning() {
                             </select>
                         </div>
                     </div>
+                    {mountErrors[idx] && (
+                      <div className="mt-1 flex items-center gap-2">
+                        <p className="text-xs text-red-400">{mountErrors[idx].message}</p>
+                        {mountErrors[idx].showSettingsCta && (
+                          <button
+                            type="button"
+                            onClick={goToSettingsForSsh}
+                            className="text-xs text-red-300 underline underline-offset-2 hover:text-red-200 transition-colors"
+                          >
+                            {t('provisioning.goToSettings')}
+                          </button>
+                        )}
+                      </div>
+                    )}
                 </div>
               ))}
               {mounts.length === 0 && (
@@ -903,7 +1072,7 @@ export default function Provisioning() {
 
       {/* Load Template Modal */}
       {isLoadModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] backdrop-blur-sm">
+        <OverlayPortal>
             <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[80vh]">
                 <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
                     <h3 className="text-xl font-bold text-[var(--text)]">{t('provisioning.loadTemplateTitle')}</h3>
@@ -962,7 +1131,7 @@ export default function Provisioning() {
                     </button>
                 </div>
             </div>
-        </div>
+        </OverlayPortal>
       )}
     </div>
   );

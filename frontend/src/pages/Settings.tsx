@@ -6,6 +6,7 @@ import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { withApiMessage } from '../utils/i18nMessage';
 import { decrypt, encrypt } from '../utils/crypto';
+import OverlayPortal from '../components/OverlayPortal';
 
 type StatusState = { type: 'idle' | 'loading' | 'success' | 'error'; message?: string };
 type TmuxSession = { name: string; attached: number; windows: number };
@@ -502,7 +503,7 @@ export default function Settings() {
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {announcementEditorOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm">
+        <OverlayPortal className="p-4">
           <div className="w-full max-w-4xl overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] shadow-2xl">
             <div className="flex items-center justify-between border-b border-[var(--border)] p-6">
               <div>
@@ -546,7 +547,7 @@ export default function Settings() {
               </button>
             </div>
           </div>
-        </div>
+        </OverlayPortal>
       )}
 
       <div>

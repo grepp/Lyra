@@ -216,6 +216,52 @@ ssh-keyscan <SSH_HOST> | ssh-keygen -lf -
 
 ---
 
+## Host Path Browse (Provisioning)
+
+Provisioning `Volume Mounts` supports both manual host path input and SSH-based directory browsing.
+
+### Prerequisites
+
+- SSH settings must be configured in `Settings > Host Server Connection`.
+- Required keys:
+  - `ssh_host`
+  - `ssh_port`
+  - `ssh_username`
+  - `ssh_auth_method`
+  - `ssh_password` (when auth method is `password`)
+- Host key trust must be valid for current policy (`SSH_HOST_KEY_POLICY` + `SSH_KNOWN_HOSTS_PATH` / fingerprint).
+
+### Failure Guide
+
+Lyra separates failures into two groups:
+
+- Configuration/Connection issues:
+  - missing SSH settings
+  - authentication failed
+  - host key verification failed
+  - generic connection validation failed
+- Host path issues:
+  - permission denied
+  - path not found
+  - generic browse failure
+
+When configuration is missing, Provisioning shows an inline row error with a `Go to Settings` CTA.
+
+### Performance Limit
+
+- `POST /api/filesystem/host/list` returns at most `500` entries per request.
+- If more entries exist, response includes `truncated=true` and UI shows a partial-list notice.
+
+### Manual QA Checklist
+
+- [ ] Click `Browse` with SSH settings missing; verify inline warning + `Go to Settings`.
+- [ ] Configure SSH and verify `Browse` opens picker and selecting a directory fills `host_path`.
+- [ ] Verify permission denied path error is shown inline.
+- [ ] Verify non-existent path error is shown inline.
+- [ ] Verify large directory shows partial-list (`truncated`) notice.
+
+---
+
 ## i18n Guide
 
 Frontend supports `en` and `ko` with default language `en`.

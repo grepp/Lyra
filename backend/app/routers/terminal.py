@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from typing import Optional
 import re
 from ..core.ssh_policy import connect_ssh, map_ssh_error
+from ..core.ssh_host import connect_host_ssh, map_host_ssh_error
 
 
 router = APIRouter(
@@ -91,25 +92,9 @@ def _sanitize_tmux_session_name(raw: str) -> Optional[str]:
 
 
 async def _connect_terminal_ssh(db: AsyncSession, private_key: Optional[str] = None):
-    ssh_host = await get_setting_value(db, "ssh_host")
-    ssh_port_str = await get_setting_value(db, "ssh_port", "22")
-    ssh_port = int(ssh_port_str) if ssh_port_str.isdigit() else 22
-    ssh_user = await get_setting_value(db, "ssh_username")
-    ssh_auth_method = await get_setting_value(db, "ssh_auth_method", "password")
-    ssh_password = await get_setting_value(db, "ssh_password")
-    ssh_host_fingerprint = await get_setting_value(db, "ssh_host_fingerprint")
-
-    if not ssh_host or not ssh_user:
-        raise ValueError("ssh_host_not_configured")
-
-    return connect_ssh(
-        host=ssh_host,
-        port=ssh_port,
-        username=ssh_user,
-        auth_method=ssh_auth_method,
-        password=ssh_password,
+    return await connect_host_ssh(
+        db,
         private_key=private_key,
-        host_fingerprint=ssh_host_fingerprint,
         timeout=10,
     )
 
@@ -198,10 +183,8 @@ async def list_tmux_sessions(req: TmuxSessionListRequest, db: AsyncSession = Dep
 
         sessions = sorted(sessions_by_name.values(), key=lambda item: item["name"])
         return {"status": "success", "installed": True, "sessions": sessions}
-    except ValueError:
-        return {"status": "error", "code": "ssh_host_not_configured", "message": "Host server is not configured."}
     except Exception as e:
-        code, message = map_ssh_error(e)
+        code, message = map_host_ssh_error(e)
         return {"status": "error", "code": code, "message": message}
     finally:
         if ssh_client:
@@ -252,10 +235,8 @@ async def kill_tmux_sessions(req: TmuxSessionKillRequest, db: AsyncSession = Dep
             "removed": removed,
             "skipped": skipped,
         }
-    except ValueError:
-        return {"status": "error", "code": "ssh_host_not_configured", "message": "Host server is not configured."}
     except Exception as e:
-        code, message = map_ssh_error(e)
+        code, message = map_host_ssh_error(e)
         return {"status": "error", "code": code, "message": message}
     finally:
         if ssh_client:
@@ -265,14 +246,6 @@ async def kill_tmux_sessions(req: TmuxSessionKillRequest, db: AsyncSession = Dep
 @router.websocket("/ws")
 async def websocket_terminal(websocket: WebSocket, db: AsyncSession = Depends(get_db)):
     await websocket.accept()
-
-    ssh_host = await get_setting_value(db, "ssh_host")
-    ssh_port_str = await get_setting_value(db, "ssh_port", "22")
-    ssh_port = int(ssh_port_str) if ssh_port_str.isdigit() else 22
-    ssh_user = await get_setting_value(db, "ssh_username")
-    ssh_auth_method = await get_setting_value(db, "ssh_auth_method", "password")
-    ssh_password = await get_setting_value(db, "ssh_password")
-    ssh_host_fingerprint = await get_setting_value(db, "ssh_host_fingerprint")
 
     ssh_client = None
     chan = None
@@ -291,44 +264,25 @@ async def websocket_terminal(websocket: WebSocket, db: AsyncSession = Depends(ge
         cols = init_data.get("cols", 80)
         rows = init_data.get("rows", 24)
 
-        if ssh_host and ssh_user:
-            target_host = ssh_host
-            if target_host in ["localhost", "127.0.0.1"]:
-                target_host = "host.docker.internal"
-
-            try:
-                ssh_client = connect_ssh(
-                    host=target_host,
-                    port=ssh_port,
-                    username=ssh_user,
-                    auth_method=ssh_auth_method,
-                    password=ssh_password,
-                    private_key=ssh_key,
-                    host_fingerprint=ssh_host_fingerprint,
-                    timeout=10,
-                )
-
-                chan = ssh_client.invoke_shell(term='xterm-256color', width=cols, height=rows)
-                chan.setblocking(0)
-                await websocket.send_text(f"\x1b[32mConnected to host {ssh_host} via SSH\x1b[0m\r\n")
-                if session_key:
-                    chan.send(
-                        f"{_TMUX_BIN_SNIPPET}"
-                        f"if [ -n \"$TMUX_BIN\" ]; then \"$TMUX_BIN\" new-session -A -s {session_key}; "
-                        "else echo '[tmux not found: session persistence disabled]'; fi\n"
-                    )
-            except Exception as e:
-                code, message = map_ssh_error(e)
-                logger.error("SSH connection failed: %s (%s)", message, code)
-                await _send_ws_error(websocket, code, f"SSH Connection Failed: {message}")
-                await websocket.close()
-                return
-        else:
-            await _send_ws_error(
-                websocket,
-                "ssh_host_not_configured",
-                "Error: Host server not configured. Please check terminal settings.",
+        try:
+            ssh_client = await connect_host_ssh(
+                db,
+                private_key=ssh_key,
+                timeout=10,
             )
+            chan = ssh_client.invoke_shell(term='xterm-256color', width=cols, height=rows)
+            chan.setblocking(0)
+            await websocket.send_text("\x1b[32mConnected via SSH\x1b[0m\r\n")
+            if session_key:
+                chan.send(
+                    f"{_TMUX_BIN_SNIPPET}"
+                    f"if [ -n \"$TMUX_BIN\" ]; then \"$TMUX_BIN\" new-session -A -s {session_key}; "
+                    "else echo '[tmux not found: session persistence disabled]'; fi\n"
+                )
+        except Exception as e:
+            code, message = map_host_ssh_error(e)
+            logger.error("SSH connection failed: %s (%s)", message, code)
+            await _send_ws_error(websocket, code, f"SSH Connection Failed: {message}")
             await websocket.close()
             return
 

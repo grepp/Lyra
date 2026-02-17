@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import Modal from '../components/Modal';
+import OverlayPortal from '../components/OverlayPortal';
 
 interface Template {
   id: string;
@@ -88,7 +89,7 @@ export default function Templates() {
 
       {/* Template Details Modal */}
       {selectedTemplate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] backdrop-blur-sm">
+        <OverlayPortal>
             <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
                 <div className="p-6 border-b border-[var(--border)] flex justify-between items-start">
                     <div>
@@ -151,7 +152,7 @@ export default function Templates() {
                     </button>
                 </div>
             </div>
-        </div>
+        </OverlayPortal>
       )}
 
       <header>

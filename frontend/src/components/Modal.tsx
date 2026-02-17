@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import OverlayPortal from './OverlayPortal';
 
 interface ModalProps {
     isOpen: boolean;
@@ -24,7 +25,7 @@ export default function Modal({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] p-4 backdrop-blur-sm">
+        <OverlayPortal className="p-4">
             <div className="w-full max-w-md scale-100 transform rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] opacity-100 shadow-2xl transition-all animate-in fade-in zoom-in duration-200">
                 <div className="flex items-center justify-between border-b border-[var(--border)] p-6">
                     <h3 className="text-lg font-bold text-[var(--text)]">{title}</h3>
@@ -59,6 +60,6 @@ export default function Modal({
                     </button>
                 </div>
             </div>
-        </div>
+        </OverlayPortal>
     );
 }

@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
+import OverlayPortal from '../components/OverlayPortal';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
 
@@ -355,7 +356,7 @@ export default function Dashboard() {
 
       {/* Volume Details Modal */}
       {selectedVolEnv && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] backdrop-blur-sm">
+        <OverlayPortal>
             <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
                 <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
                     <h3 className="text-xl font-bold text-[var(--text)] flex items-center gap-2">
@@ -395,12 +396,12 @@ export default function Dashboard() {
                     </button>
                 </div>
             </div>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* Port Details Modal */}
       {selectedPortEnv && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] backdrop-blur-sm">
+        <OverlayPortal>
             <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
                 <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
                     <h3 className="text-xl font-bold text-[var(--text)] flex items-center gap-2">
@@ -436,12 +437,12 @@ export default function Dashboard() {
                     </button>
                 </div>
             </div>
-        </div>
+        </OverlayPortal>
       )}
 
       {/* Error Log Modal */}
       {errorLogEnv && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--overlay)] backdrop-blur-sm">
+        <OverlayPortal>
             <div className="bg-[var(--bg-elevated)] rounded-xl border border-[var(--border)] shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
                 <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
                     <h3 className="text-xl font-bold text-[var(--text)] flex items-center gap-2">
@@ -475,7 +476,7 @@ export default function Dashboard() {
                     </button>
                 </div>
             </div>
-        </div>
+        </OverlayPortal>
       )}
 
       <div className="flex justify-between items-center">
