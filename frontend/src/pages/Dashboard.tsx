@@ -342,13 +342,28 @@ export default function Dashboard() {
     setDeleteId(null);
   };
 
-  const forceDeleteEnvironment = async () => {
-    if (!forceDeleteId) return;
+  const forceDeleteEnvironment = async (environmentId: string) => {
+    if (!environmentId) return;
     try {
-      await axios.delete(`environments/${forceDeleteId}`, { params: { force: true } });
+      await axios.delete(`environments/${environmentId}`, { params: { force: true } });
       await fetchEnvironments();
+      showToast(t('feedback.dashboard.environmentDeleted'), 'success');
     } catch (error) {
       console.error("Failed to force delete environment", error);
+      let message = t('feedback.dashboard.deleteEnvironmentFailed');
+      if (axios.isAxiosError(error)) {
+        const detail = error.response?.data?.detail;
+        if (typeof detail === 'object' && detail) {
+          const code = String(detail.code || '');
+          const apiMessage = String(detail.message || '');
+          if (code === 'worker_not_found') {
+            message = t('dashboard.workerError.worker_not_found');
+          } else if (apiMessage) {
+            message = apiMessage;
+          }
+        }
+      }
+      showToast(message, 'error');
     } finally {
       setForceDeleteId(null);
     }
@@ -629,7 +644,10 @@ export default function Dashboard() {
       <Modal
         isOpen={!!forceDeleteId}
         onClose={() => setForceDeleteId(null)}
-        onConfirm={forceDeleteEnvironment}
+        onConfirm={() => {
+          if (!forceDeleteId) return;
+          void forceDeleteEnvironment(forceDeleteId);
+        }}
         title={t('dashboard.forceDeleteEnvironmentTitle')}
         message={t('dashboard.forceDeleteEnvironmentMessage')}
         isDestructive={true}
