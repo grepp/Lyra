@@ -60,7 +60,7 @@ async def worker_stop_environment(environment_id: str, db: AsyncSession = Depend
     return await env_router.stop_environment(environment_id=environment_id, db=db)
 
 
-@router.delete("/environments/{environment_id}")
+@router.delete("/environments/{environment_id}", status_code=204)
 async def worker_delete_environment(environment_id: str, db: AsyncSession = Depends(get_db)):
     return await env_router.delete_environment(environment_id=environment_id, db=db)
 

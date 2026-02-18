@@ -4,6 +4,7 @@ import types
 import uuid
 
 import httpx
+import pytest
 if "paramiko" not in sys.modules:
     paramiko_stub = types.ModuleType("paramiko")
 
@@ -153,3 +154,59 @@ def test_refresh_worker_health_uses_cache(monkeypatch):
     assert second.status == worker_registry.WORKER_HEALTH_HEALTHY
     assert calls["count"] == 1
     assert db.flush_calls == 1
+
+
+def test_call_worker_api_accepts_null_body_on_success(monkeypatch):
+    worker = WorkerServer(
+        id=uuid.uuid4(),
+        name="worker-1",
+        base_url="http://worker.local",
+        api_token_encrypted="enc",
+    )
+
+    def _fake_build(_worker):
+        return worker_registry.WorkerConnectionConfig(
+            id=str(_worker.id),
+            name=_worker.name,
+            base_url=_worker.base_url,
+            api_token="token",
+        )
+
+    async def _fake_request(**_kwargs):
+        return 200, None
+
+    monkeypatch.setattr(worker_registry, "build_worker_connection_config", _fake_build)
+    monkeypatch.setattr(worker_registry, "_request_worker_json", _fake_request)
+
+    result = asyncio.run(
+        worker_registry.call_worker_api(worker, method="DELETE", path=f"/api/worker/environments/{uuid.uuid4()}")
+    )
+    assert result == {}
+
+
+def test_call_worker_api_rejects_non_object_body_on_success(monkeypatch):
+    worker = WorkerServer(
+        id=uuid.uuid4(),
+        name="worker-1",
+        base_url="http://worker.local",
+        api_token_encrypted="enc",
+    )
+
+    def _fake_build(_worker):
+        return worker_registry.WorkerConnectionConfig(
+            id=str(_worker.id),
+            name=_worker.name,
+            base_url=_worker.base_url,
+            api_token="token",
+        )
+
+    async def _fake_request(**_kwargs):
+        return 200, []
+
+    monkeypatch.setattr(worker_registry, "build_worker_connection_config", _fake_build)
+    monkeypatch.setattr(worker_registry, "_request_worker_json", _fake_request)
+
+    with pytest.raises(worker_registry.WorkerRequestError) as exc_info:
+        asyncio.run(worker_registry.call_worker_api(worker, method="GET", path="/api/worker/environments"))
+
+    assert exc_info.value.code == "worker_api_mismatch"

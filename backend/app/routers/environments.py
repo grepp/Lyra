@@ -82,6 +82,18 @@ def _is_worker_environment_not_found(error: WorkerRequestError) -> bool:
     return "not found" in message or "environment not found" in message
 
 
+async def _is_worker_environment_absent(worker: WorkerServer, environment_id: str) -> bool:
+    try:
+        await call_worker_api(
+            worker,
+            method="GET",
+            path=f"/api/worker/environments/{environment_id}",
+        )
+        return False
+    except WorkerRequestError as error:
+        return _is_worker_environment_not_found(error)
+
+
 def _cleanup_expired_jupyter_tickets():
     now = time.time()
     expired = [
@@ -1322,7 +1334,14 @@ async def delete_environment(
                         env.id,
                     )
                 else:
-                    raise _map_worker_request_error(error) from error
+                    # In some race cases, delete can fail but the environment is already gone on worker.
+                    if await _is_worker_environment_absent(worker, str(env.id)):
+                        logger.info(
+                            "Worker environment %s not found after delete error; continuing local cleanup.",
+                            env.id,
+                        )
+                    else:
+                        raise _map_worker_request_error(error) from error
 
     # Try to remove container.
     # For host environments, container removal failures should fail deletion.

@@ -120,16 +120,18 @@ async def _request_worker_json(
     path: str,
     timeout: float,
     payload: dict[str, Any] | None = None,
-) -> tuple[int, dict[str, Any]]:
+) -> tuple[int, Any]:
     url = _build_worker_api_url(base_url, path)
     headers = {"Authorization": f"Bearer {api_token}"}
     async with httpx.AsyncClient(timeout=timeout) as client:
         response = await client.request(method=method.upper(), url=url, headers=headers, json=payload)
 
-    body: dict[str, Any] = {}
+    body: Any = {}
     try:
         body = response.json() if response.content else {}
     except Exception:
+        body = {}
+    if body is None:
         body = {}
     return response.status_code, body
 
@@ -293,6 +295,9 @@ async def call_worker_api(
         raise WorkerRequestError("worker_request_failed", f"Worker HTTP error: {error}", status_code=503) from error
     except Exception as error:  # noqa: BLE001
         raise WorkerRequestError("worker_request_failed", f"Worker request failed: {error}", status_code=503) from error
+
+    if body is None:
+        body = {}
 
     if http_status in {401, 403}:
         raise WorkerRequestError("worker_auth_failed", "Worker authentication failed", status_code=502)
