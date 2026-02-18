@@ -75,6 +75,13 @@ def _is_port_unique_violation(error: IntegrityError) -> bool:
     )
 
 
+def _is_worker_environment_not_found(error: WorkerRequestError) -> bool:
+    if error.code != "worker_request_failed":
+        return False
+    message = (error.message or "").lower()
+    return "not found" in message or "environment not found" in message
+
+
 def _cleanup_expired_jupyter_tickets():
     now = time.time()
     expired = [
@@ -1308,7 +1315,14 @@ async def delete_environment(
                     path=f"/api/worker/environments/{env.id}",
                 )
             except WorkerRequestError as error:
-                raise _map_worker_request_error(error) from error
+                # Treat "already missing on worker" as idempotent success and continue local cleanup.
+                if _is_worker_environment_not_found(error):
+                    logger.info(
+                        "Worker environment %s was already missing during delete; continuing local cleanup.",
+                        env.id,
+                    )
+                else:
+                    raise _map_worker_request_error(error) from error
 
     # Try to remove container.
     # For host environments, container removal failures should fail deletion.
