@@ -36,7 +36,8 @@ async def worker_create_environment(env: EnvironmentCreate, db: AsyncSession = D
 
 @router.get("/environments")
 async def worker_list_environments(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)):
-    return await env_router.read_environments(skip=skip, limit=limit, db=db)
+    environments = await env_router.read_environments(skip=skip, limit=limit, db=db)
+    return {"environments": environments}
 
 
 @router.get("/environments/{environment_id}")

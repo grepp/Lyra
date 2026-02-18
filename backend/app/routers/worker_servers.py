@@ -249,7 +249,10 @@ async def _get_worker_orphan_environment_ids(db: AsyncSession, worker: WorkerSer
         method="GET",
         path="/api/worker/environments?skip=0&limit=10000",
     )
-    remote_envs = remote_payload if isinstance(remote_payload, list) else []
+    if isinstance(remote_payload, dict):
+        remote_envs = remote_payload.get("environments") or []
+    else:
+        remote_envs = []
 
     remote_ids: set[str] = set()
     for item in remote_envs:
