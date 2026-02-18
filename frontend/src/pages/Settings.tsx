@@ -1087,23 +1087,23 @@ export default function Settings() {
               value={workerForm.name}
               onChange={(e) => setWorkerForm((prev) => ({ ...prev, name: e.target.value }))}
               placeholder={t('settings.workerServerNamePlaceholder')}
-              className={`lg:col-span-2 ${inputClass}`}
+              className={`lg:col-span-3 ${inputClass}`}
             />
             <input
               type="text"
               value={workerForm.base_url}
               onChange={(e) => setWorkerForm((prev) => ({ ...prev, base_url: e.target.value }))}
               placeholder={t('settings.workerServerBaseUrlPlaceholder')}
-              className={`lg:col-span-4 ${inputClass}`}
+              className={`lg:col-span-5 ${inputClass}`}
             />
             <input
               type="password"
               value={workerForm.api_token}
               onChange={(e) => setWorkerForm((prev) => ({ ...prev, api_token: e.target.value }))}
               placeholder={t('settings.workerServerApiTokenPlaceholder')}
-              className={`lg:col-span-3 ${inputClass}`}
+              className={`lg:col-span-2 ${inputClass}`}
             />
-            <button type="submit" className={`lg:col-span-3 ${primaryButtonClass} py-2.5`} disabled={workerStatus.type === 'loading'}>
+            <button type="submit" className={`lg:col-span-2 ${primaryButtonClass} py-2.5`} disabled={workerStatus.type === 'loading'}>
               {t('settings.addWorkerServer')}
             </button>
           </form>
