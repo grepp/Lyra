@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -1247,22 +1247,39 @@ async def launch_code_with_ticket(
 
 
 @router.delete("/{environment_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_environment(environment_id: str, db: AsyncSession = Depends(get_db)):
+async def delete_environment(
+    environment_id: str,
+    force: bool = Query(default=False),
+    db: AsyncSession = Depends(get_db),
+):
     result = await db.execute(select(Environment).where(Environment.id == environment_id))
     env = result.scalars().first()
     if env is None:
         raise HTTPException(status_code=404, detail="Environment not found")
 
     if env.worker_server_id:
-        worker = await _assert_worker_is_ready(db, env.worker_server_id)
-        try:
-            await call_worker_api(
-                worker,
-                method="DELETE",
-                path=f"/api/worker/environments/{env.id}",
-            )
-        except WorkerRequestError as error:
-            raise _map_worker_request_error(error) from error
+        if force:
+            worker = await _get_worker_server_by_id(db, env.worker_server_id)
+            if worker:
+                try:
+                    await call_worker_api(
+                        worker,
+                        method="DELETE",
+                        path=f"/api/worker/environments/{env.id}",
+                    )
+                except WorkerRequestError:
+                    # Force delete should still allow local cleanup for orphaned environments.
+                    pass
+        else:
+            worker = await _assert_worker_is_ready(db, env.worker_server_id)
+            try:
+                await call_worker_api(
+                    worker,
+                    method="DELETE",
+                    path=f"/api/worker/environments/{env.id}",
+                )
+            except WorkerRequestError as error:
+                raise _map_worker_request_error(error) from error
 
     # Try to remove container
     try:

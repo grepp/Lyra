@@ -82,6 +82,7 @@ export default function Dashboard() {
     return Boolean(window.localStorage.getItem(ENVS_CACHE_KEY));
   });
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [forceDeleteId, setForceDeleteId] = useState<string | null>(null);
   const [selectedVolEnv, setSelectedVolEnv] = useState<Environment | null>(null);
   const [selectedPortEnv, setSelectedPortEnv] = useState<Environment | null>(null);
   const [errorLogEnv, setErrorLogEnv] = useState<Environment | null>(null);
@@ -317,14 +318,40 @@ export default function Dashboard() {
 
   const deleteEnvironment = async () => {
     if (!deleteId) return;
+    const targetId = deleteId;
     try {
-        await axios.delete(`environments/${deleteId}`);
-        fetchEnvironments();
+        await axios.delete(`environments/${targetId}`);
+        await fetchEnvironments();
     } catch (error) {
+        if (axios.isAxiosError(error)) {
+          const detail = error.response?.data?.detail;
+          const code = typeof detail === 'object' && detail ? String(detail.code || '') : '';
+          const message = typeof detail === 'object' && detail ? String(detail.message || '') : '';
+          const msgLower = message.toLowerCase();
+          const isWorkerDeleteMismatch =
+            code === 'worker_unreachable' ||
+            code === 'worker_not_found' ||
+            (code === 'worker_request_failed' && msgLower.includes('environment not found'));
+          if (isWorkerDeleteMismatch) {
+            setForceDeleteId(targetId);
+            return;
+          }
+        }
         console.error("Failed to delete environment", error);
-        // Could also add an error modal here
     }
     setDeleteId(null);
+  };
+
+  const forceDeleteEnvironment = async () => {
+    if (!forceDeleteId) return;
+    try {
+      await axios.delete(`environments/${forceDeleteId}`, { params: { force: true } });
+      await fetchEnvironments();
+    } catch (error) {
+      console.error("Failed to force delete environment", error);
+    } finally {
+      setForceDeleteId(null);
+    }
   };
 
   const withActionLoading = async (environmentId: string, action: () => Promise<void>) => {
@@ -597,6 +624,14 @@ export default function Dashboard() {
         onConfirm={deleteEnvironment}
         title={t('dashboard.deleteEnvironmentTitle')}
         message={t('dashboard.deleteEnvironmentMessage')}
+        isDestructive={true}
+      />
+      <Modal
+        isOpen={!!forceDeleteId}
+        onClose={() => setForceDeleteId(null)}
+        onConfirm={forceDeleteEnvironment}
+        title={t('dashboard.forceDeleteEnvironmentTitle')}
+        message={t('dashboard.forceDeleteEnvironmentMessage')}
         isDestructive={true}
       />
 

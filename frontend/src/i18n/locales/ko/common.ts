@@ -69,6 +69,8 @@ const koCommon = {
     collapseNotice: '공지사항 닫기',
     deleteEnvironmentTitle: '환경 삭제',
     deleteEnvironmentMessage: '이 환경을 삭제하시겠습니까? 이 작업은 되돌릴 수 없으며 컨테이너와 데이터가 영구 삭제됩니다.',
+    forceDeleteEnvironmentTitle: 'Orphan 환경 강제 삭제',
+    forceDeleteEnvironmentMessage: '워커 상태를 확인할 수 없습니다. Lyra에서 이 환경을 강제로 삭제하시겠습니까?',
     volumeMounts: '볼륨 마운트',
     mountedVolumesFor: '{{name}}의 마운트 볼륨',
     customPortMappings: '커스텀 포트 매핑',

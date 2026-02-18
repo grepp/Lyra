@@ -70,6 +70,9 @@ const enCommon = {
     deleteEnvironmentTitle: 'Delete Environment',
     deleteEnvironmentMessage:
       'Are you sure you want to delete this environment? This action cannot be undone and will permanently remove the container and data.',
+    forceDeleteEnvironmentTitle: 'Force Delete Orphan Environment',
+    forceDeleteEnvironmentMessage:
+      'Worker state could not be resolved. Do you want to force-delete this environment from Lyra anyway?',
     volumeMounts: 'Volume Mounts',
     mountedVolumesFor: 'Mounted volumes for {{name}}',
     customPortMappings: 'Custom Port Mappings',
