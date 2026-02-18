@@ -7,10 +7,12 @@ import { useTheme } from '../context/ThemeContext';
 import { withApiMessage } from '../utils/i18nMessage';
 import { decrypt, encrypt } from '../utils/crypto';
 import OverlayPortal from '../components/OverlayPortal';
+import Modal from '../components/Modal';
 import { getStoredUserName, setStoredUserName } from '../utils/userIdentity';
 
 type StatusState = { type: 'idle' | 'loading' | 'success' | 'error'; message?: string };
 type TmuxSession = { name: string; attached: number; windows: number };
+type ResourceCleanupTarget = 'images' | 'volumes' | 'buildCache' | 'tmuxSessions' | null;
 type WorkerServer = {
   id: string;
   name: string;
@@ -86,6 +88,7 @@ export default function Settings() {
   const [tmuxSessions, setTmuxSessions] = useState<TmuxSession[]>([]);
   const [selectedTmuxSessions, setSelectedTmuxSessions] = useState<string[]>([]);
   const [tmuxLoading, setTmuxLoading] = useState(false);
+  const [resourceCleanupTarget, setResourceCleanupTarget] = useState<ResourceCleanupTarget>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const faviconInputRef = useRef<HTMLInputElement>(null);
 
@@ -553,6 +556,49 @@ export default function Settings() {
     }
   };
 
+  const getResourceCleanupConfirmContent = (): { title: string; message: string } => {
+    if (resourceCleanupTarget === 'images') {
+      return {
+        title: t('settings.cleanupConfirmImagesTitle'),
+        message: t('settings.cleanupConfirmImagesMessage'),
+      };
+    }
+    if (resourceCleanupTarget === 'volumes') {
+      return {
+        title: t('settings.cleanupConfirmVolumesTitle'),
+        message: t('settings.cleanupConfirmVolumesMessage', { count: selectedVolumes.length }),
+      };
+    }
+    if (resourceCleanupTarget === 'tmuxSessions') {
+      return {
+        title: t('settings.cleanupConfirmTerminalSessionsTitle'),
+        message: t('settings.cleanupConfirmTerminalSessionsMessage', { count: selectedTmuxSessions.length }),
+      };
+    }
+    return {
+      title: t('settings.cleanupConfirmBuildCacheTitle'),
+      message: t('settings.cleanupConfirmBuildCacheMessage'),
+    };
+  };
+
+  const handleConfirmResourceCleanup = () => {
+    if (resourceCleanupTarget === 'images') {
+      void runImagePrune();
+      return;
+    }
+    if (resourceCleanupTarget === 'volumes') {
+      void runVolumePrune();
+      return;
+    }
+    if (resourceCleanupTarget === 'buildCache') {
+      void runBuildCachePrune();
+      return;
+    }
+    if (resourceCleanupTarget === 'tmuxSessions') {
+      void killSelectedTmuxSessions();
+    }
+  };
+
   const isLoading = appLoading || isSettingsLoading;
   const refreshResourceManagement = async () => {
     await Promise.allSettled([
@@ -661,6 +707,18 @@ export default function Settings() {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <Modal
+        isOpen={resourceCleanupTarget !== null}
+        onClose={() => setResourceCleanupTarget(null)}
+        onConfirm={handleConfirmResourceCleanup}
+        title={getResourceCleanupConfirmContent().title}
+        message={getResourceCleanupConfirmContent().message}
+        type="confirm"
+        isDestructive
+        confirmText={t('actions.confirm')}
+        cancelText={t('actions.cancel')}
+      />
+
       {announcementEditorOpen && (
         <OverlayPortal className="p-4">
           <div className="w-full max-w-4xl overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] shadow-2xl">
@@ -1152,7 +1210,7 @@ export default function Settings() {
                 </div>
               ))}
             </div>
-            <button type="button" onClick={runImagePrune} className={dangerButtonClass}>
+            <button type="button" onClick={() => setResourceCleanupTarget('images')} className={dangerButtonClass}>
               {t('resource.cleanupImages')}
             </button>
           </div>
@@ -1183,7 +1241,7 @@ export default function Settings() {
                 </label>
               ))}
             </div>
-            <button type="button" onClick={runVolumePrune} className={dangerButtonClass} disabled={selectedVolumes.length === 0}>
+            <button type="button" onClick={() => setResourceCleanupTarget('volumes')} className={dangerButtonClass} disabled={selectedVolumes.length === 0}>
               {t('resource.removeSelectedVolumes')}
             </button>
           </div>
@@ -1192,7 +1250,7 @@ export default function Settings() {
             <h4 className="text-[var(--text)] font-medium">{t('settings.buildCache')}</h4>
             <div className="text-sm text-[var(--text)]">{t('settings.entries')}: <span className="font-mono">{buildCache.count}</span></div>
             <div className="text-sm text-[var(--text)]">{t('settings.size')}: <span className="font-mono">{formatBytes(buildCache.size)}</span></div>
-            <button type="button" onClick={runBuildCachePrune} className={dangerButtonClass}>
+            <button type="button" onClick={() => setResourceCleanupTarget('buildCache')} className={dangerButtonClass}>
               {t('resource.cleanupBuildCache')}
             </button>
           </div>
@@ -1230,7 +1288,7 @@ export default function Settings() {
 
             <button
               type="button"
-              onClick={killSelectedTmuxSessions}
+              onClick={() => setResourceCleanupTarget('tmuxSessions')}
               className={dangerButtonClass}
               disabled={tmuxLoading || selectedTmuxSessions.length === 0}
             >
