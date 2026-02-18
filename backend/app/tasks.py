@@ -127,7 +127,7 @@ def _validate_runtime_prerequisites(
 
 def _build_runtime_command(jupyter_mode: Optional[str], enable_jupyter: bool, enable_code_server: bool) -> str:
     script_parts = [
-        "set -euo pipefail",
+        "set -eu",
         "mkdir -p /var/run/sshd",
         "mkdir -p /etc/ssh",
         "[ -f /etc/ssh/sshd_config ] || touch /etc/ssh/sshd_config",
