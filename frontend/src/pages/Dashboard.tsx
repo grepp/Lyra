@@ -884,7 +884,7 @@ export default function Dashboard() {
                     },
                     table: ({ ...props }) => (
                       <div className="my-3 overflow-x-auto">
-                        <table {...props} className="w-full min-w-[420px] border-collapse text-left text-sm" />
+                        <table {...props} className="w-auto border-collapse text-left text-sm" />
                       </div>
                     ),
                     thead: ({ ...props }) => <thead {...props} className="bg-[var(--bg-soft)]" />,
