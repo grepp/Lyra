@@ -1059,10 +1059,21 @@ async def read_environment(environment_id: str, db: AsyncSession = Depends(get_d
             client = docker.from_env()
             container = client.containers.get(container_name)
             container_id = container.short_id or (container.id[:12] if container.id else None)
+            state_info = container.attrs.get("State", {})
+            response_status = _resolve_environment_status(
+                current_status=env.status,
+                container_status=container.status,
+                state_status=state_info.get("Status", ""),
+                exit_code=state_info.get("ExitCode"),
+                oom_killed=state_info.get("OOMKilled", False),
+                error_msg=state_info.get("Error", ""),
+            )
             if isinstance(container_id, str) and len(container_id) > 12:
                 container_id = container_id[:12]
         except docker.errors.NotFound:
             container_id = None
+            if env.status in ["running", "stopping", "starting"]:
+                response_status = "stopped"
         except Exception as error:
             logger.warning("Failed to resolve container id for environment %s: %s", env.id, error)
             container_id = None

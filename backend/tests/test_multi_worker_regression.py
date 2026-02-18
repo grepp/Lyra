@@ -193,6 +193,15 @@ def test_read_environment_local_includes_container_id(monkeypatch):
     class _Container:
         short_id = "1234567890abcdef"
         id = "1234567890abcdef"
+        status = "running"
+        attrs = {
+            "State": {
+                "Status": "running",
+                "ExitCode": None,
+                "OOMKilled": False,
+                "Error": "",
+            }
+        }
 
     class _ContainerStore:
         def get(self, name):
@@ -208,6 +217,25 @@ def test_read_environment_local_includes_container_id(monkeypatch):
 
     assert result["container_id"] == "1234567890ab"
     assert result["status"] == "running"
+
+
+def test_read_environment_local_stopping_becomes_stopped_when_container_missing(monkeypatch):
+    env = _env("local-stopping-env", "stopping")
+    db = _FakeDb(envs=[env], workers=[])
+
+    class _ContainerStore:
+        def get(self, _name):
+            raise docker.errors.NotFound("missing")
+
+    class _DockerClient:
+        containers = _ContainerStore()
+
+    monkeypatch.setattr(env_router.docker, "from_env", lambda: _DockerClient())
+
+    result = asyncio.run(env_router.read_environment(environment_id=str(env.id), db=db))
+
+    assert result["container_id"] is None
+    assert result["status"] == "stopped"
 
 
 def test_worker_gpu_proxy_maps_worker_error(monkeypatch):
