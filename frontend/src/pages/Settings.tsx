@@ -15,7 +15,6 @@ type WorkerServer = {
   id: string;
   name: string;
   base_url: string;
-  is_active: boolean;
   last_health_status: string;
   last_health_checked_at?: string | null;
   last_error_message?: string | null;
@@ -65,7 +64,6 @@ export default function Settings() {
     name: '',
     base_url: '',
     api_token: '',
-    is_active: true,
   });
 
   // SSH Settings State
@@ -605,24 +603,12 @@ export default function Settings() {
     try {
       setWorkerStatus({ type: 'loading', message: t('feedback.settings.workerSaving') });
       await axios.post('worker-servers/', workerForm);
-      setWorkerForm({ name: '', base_url: '', api_token: '', is_active: true });
+      setWorkerForm({ name: '', base_url: '', api_token: '' });
       await loadWorkerServers(false);
       setWorkerStatus({ type: 'success', message: t('feedback.settings.workerSaved') });
       setTimeout(() => setWorkerStatus({ type: 'idle' }), 3000);
     } catch (error: unknown) {
       setWorkerStatus({ type: 'error', message: localizeWorkerApiError(error, 'feedback.settings.workerSaveFailed') });
-    }
-  };
-
-  const handleToggleWorkerActive = async (worker: WorkerServer, checked: boolean) => {
-    try {
-      setWorkerStatus({ type: 'loading', message: t('feedback.settings.workerSaving') });
-      await axios.put(`worker-servers/${worker.id}`, { is_active: checked });
-      await loadWorkerServers(false);
-      setWorkerStatus({ type: 'success', message: t('feedback.settings.workerUpdated') });
-      setTimeout(() => setWorkerStatus({ type: 'idle' }), 3000);
-    } catch (error: unknown) {
-      setWorkerStatus({ type: 'error', message: localizeWorkerApiError(error, 'feedback.settings.workerUpdateFailed') });
     }
   };
 
@@ -653,7 +639,6 @@ export default function Settings() {
   const getWorkerHealthBadgeClass = (status: string) => {
     if (status === 'healthy') return 'bg-green-500/10 text-green-500';
     if (status === 'unknown') return 'bg-gray-500/10 text-gray-400';
-    if (status === 'inactive') return 'bg-gray-500/10 text-gray-400';
     if (status === 'auth_failed') return 'bg-orange-500/10 text-orange-400';
     return 'bg-red-500/10 text-red-500';
   };
@@ -1060,15 +1045,7 @@ export default function Settings() {
               placeholder={t('settings.workerServerApiTokenPlaceholder')}
               className={`lg:col-span-3 ${inputClass}`}
             />
-            <label className="lg:col-span-1 inline-flex items-center gap-2 text-sm text-[var(--text)]">
-              <input
-                type="checkbox"
-                checked={workerForm.is_active}
-                onChange={(e) => setWorkerForm((prev) => ({ ...prev, is_active: e.target.checked }))}
-              />
-              {t('settings.active')}
-            </label>
-            <button type="submit" className={`lg:col-span-2 ${primaryButtonClass} py-2.5`} disabled={workerStatus.type === 'loading'}>
+            <button type="submit" className={`lg:col-span-3 ${primaryButtonClass} py-2.5`} disabled={workerStatus.type === 'loading'}>
               {t('settings.addWorkerServer')}
             </button>
           </form>
@@ -1099,14 +1076,6 @@ export default function Settings() {
                 )}
 
                 <div className="flex flex-wrap items-center gap-3">
-                  <label className="inline-flex items-center gap-2 text-xs text-[var(--text)]">
-                    <input
-                      type="checkbox"
-                      checked={worker.is_active}
-                      onChange={(e) => { void handleToggleWorkerActive(worker, e.target.checked); }}
-                    />
-                    {t('settings.active')}
-                  </label>
                   <button type="button" className={secondaryButtonClass} onClick={() => { void handleCheckWorkerHealth(worker); }}>
                     {t('settings.checkHealth')}
                   </button>

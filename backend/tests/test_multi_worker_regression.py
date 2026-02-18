@@ -123,7 +123,7 @@ def test_read_environments_multi_worker_mixed_health(monkeypatch):
     async def _fake_custom_ports_map(_db):
         return {}
 
-    async def _fake_refresh_health(_db, worker):
+    async def _fake_refresh_health(_db, worker, **_kwargs):
         if str(worker.id) == str(worker_ok.id):
             worker.last_health_status = WORKER_HEALTH_HEALTHY
             worker.last_error_message = None
@@ -161,8 +161,8 @@ def test_read_environments_multi_worker_mixed_health(monkeypatch):
     assert by_name["remote-down"]["worker_server_name"] == "worker-down"
     assert by_name["remote-down"]["worker_error_code"] == "worker_health_unreachable"
     assert by_name["remote-down"]["worker_error_message"] == "connect failed"
-    assert by_name["remote-down"]["status"] == "error"
-    assert db.commit_called is True
+    assert by_name["remote-down"]["status"] == "unknown"
+    assert db.commit_called is False
 
 
 def test_read_environment_worker_error_payload(monkeypatch):
@@ -182,8 +182,8 @@ def test_read_environment_worker_error_payload(monkeypatch):
     assert result["worker_server_name"] == "worker-fail"
     assert result["worker_error_code"] == "worker_request_failed"
     assert result["worker_error_message"] == "upstream error"
-    assert result["status"] == "error"
-    assert db.commit_called is True
+    assert result["status"] == "unknown"
+    assert db.commit_called is False
 
 
 def test_worker_gpu_proxy_maps_worker_error(monkeypatch):

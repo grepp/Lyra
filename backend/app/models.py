@@ -13,7 +13,6 @@ class WorkerServer(Base):
     name = Column(String(100), unique=True, nullable=False)
     base_url = Column(Text, unique=True, nullable=False)
     api_token_encrypted = Column(Text, nullable=False)
-    is_active = Column(Boolean, nullable=False, server_default=text("true"))
     last_health_status = Column(String(32), nullable=False, server_default=text("'unknown'"))
     last_health_checked_at = Column(DateTime(timezone=True), nullable=True)
     last_error_message = Column(Text, nullable=True)

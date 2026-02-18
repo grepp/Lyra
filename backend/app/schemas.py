@@ -95,7 +95,6 @@ class TemplateResponse(TemplateBase):
 class WorkerServerBase(BaseModel):
     name: str
     base_url: str
-    is_active: bool = True
 
 
 class WorkerServerCreate(WorkerServerBase):
@@ -106,7 +105,6 @@ class WorkerServerUpdate(BaseModel):
     name: Optional[str] = None
     base_url: Optional[str] = None
     api_token: Optional[str] = None
-    is_active: Optional[bool] = None
 
 
 class WorkerServerResponse(WorkerServerBase):

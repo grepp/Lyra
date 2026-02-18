@@ -10,6 +10,7 @@ from ..core.worker_registry import (
     WorkerRequestError,
     call_worker_api,
     refresh_worker_health,
+    invalidate_worker_health_cache,
 )
 from ..database import get_db
 from ..models import Environment, WorkerServer
@@ -42,10 +43,7 @@ async def _assert_worker_ready(db: AsyncSession, worker_id: str) -> WorkerServer
     worker = result.scalars().first()
     if not worker:
         raise HTTPException(status_code=404, detail={"code": "worker_not_found", "message": "Worker server not found"})
-    if not worker.is_active:
-        raise HTTPException(status_code=409, detail={"code": "worker_inactive", "message": "Worker server is inactive"})
-    health = await refresh_worker_health(db, worker)
-    await db.commit()
+    health = await refresh_worker_health(db, worker, persist=False)
     if health.status != WORKER_HEALTH_HEALTHY:
         raise HTTPException(status_code=503, detail={"code": "worker_unreachable", "message": health.message})
     return worker
@@ -80,7 +78,7 @@ async def list_worker_servers(
     workers = result.scalars().all()
     if refresh:
         for worker in workers:
-            await refresh_worker_health(db, worker)
+            await refresh_worker_health(db, worker, use_cache=False)
         await db.commit()
     return workers
 
@@ -124,13 +122,12 @@ async def create_worker_server(payload: WorkerServerCreate, db: AsyncSession = D
         name=name,
         base_url=base_url,
         api_token_encrypted=encrypted_token,
-        is_active=payload.is_active,
     )
     db.add(worker)
 
     try:
         await db.flush()
-        await refresh_worker_health(db, worker)
+        await refresh_worker_health(db, worker, use_cache=False)
         await db.commit()
         await db.refresh(worker)
         return worker
@@ -180,9 +177,6 @@ async def update_worker_server(worker_id: str, payload: WorkerServerUpdate, db: 
             )
         worker.base_url = base_url
 
-    if payload.is_active is not None:
-        worker.is_active = payload.is_active
-
     if payload.api_token is not None:
         api_token = payload.api_token.strip()
         if not api_token:
@@ -203,7 +197,7 @@ async def update_worker_server(worker_id: str, payload: WorkerServerUpdate, db: 
 
     try:
         await db.flush()
-        await refresh_worker_health(db, worker)
+        await refresh_worker_health(db, worker, use_cache=False)
         await db.commit()
         await db.refresh(worker)
         return worker
@@ -229,7 +223,7 @@ async def check_worker_server_health(worker_id: str, db: AsyncSession = Depends(
     if not worker:
         raise HTTPException(status_code=404, detail={"code": "worker_not_found", "message": "Worker server not found"})
 
-    await refresh_worker_health(db, worker)
+    await refresh_worker_health(db, worker, use_cache=False)
     await db.commit()
     await db.refresh(worker)
     return worker
@@ -267,4 +261,5 @@ async def delete_worker_server(worker_id: str, db: AsyncSession = Depends(get_db
 
     await db.delete(worker)
     await db.commit()
+    invalidate_worker_health_cache(worker_id)
     return None

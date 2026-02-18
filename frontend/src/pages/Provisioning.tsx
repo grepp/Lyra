@@ -40,7 +40,6 @@ interface EnvironmentSummary {
 interface WorkerServerOption {
   id: string;
   name: string;
-  is_active: boolean;
   last_health_status?: string;
 }
 
@@ -193,9 +192,8 @@ export default function Provisioning() {
     try {
       const res = await axios.get('worker-servers/');
       const workers = Array.isArray(res.data) ? (res.data as WorkerServerOption[]) : [];
-      const activeWorkers = workers.filter((worker) => worker.is_active);
-      setWorkerServers(activeWorkers);
-      if (executionTarget !== 'host' && !activeWorkers.some((worker) => worker.id === executionTarget)) {
+      setWorkerServers(workers);
+      if (executionTarget !== 'host' && !workers.some((worker) => worker.id === executionTarget)) {
         setExecutionTarget('host');
       }
     } catch (error) {
@@ -294,6 +292,7 @@ export default function Provisioning() {
   };
 
   const handleOpenHostPathPicker = async (index: number) => {
+    if (executionTarget !== 'host') return;
     if (checkingBrowseIndex !== null) return;
     setCheckingBrowseIndex(index);
     setMountErrors((prev) => {
@@ -956,17 +955,22 @@ export default function Provisioning() {
                                 placeholder={t('provisioning.hostPathPlaceholder')}
                                 value={mount.host_path}
                                 onChange={(e) => handleMountChange(idx, 'host_path', e.target.value)}
-                                className="w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2 pl-9 pr-16 text-sm text-[var(--text)] focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all"
+                                className={clsx(
+                                  "w-full bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-2 pl-9 text-sm text-[var(--text)] focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/20 transition-all",
+                                  executionTarget === 'host' ? 'pr-16' : 'pr-3'
+                                )}
                             />
-                            <button
-                              type="button"
-                              onClick={() => { void handleOpenHostPathPicker(idx); }}
-                              disabled={checkingBrowseIndex !== null}
-                              className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--bg-soft)] px-2 py-1 text-[10px] text-[var(--text)] hover:brightness-95 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                              {checkingBrowseIndex === idx ? <Loader2 size={10} className="animate-spin" /> : null}
-                              {t('provisioning.hostPathBrowseButton')}
-                            </button>
+                            {executionTarget === 'host' && (
+                              <button
+                                type="button"
+                                onClick={() => { void handleOpenHostPathPicker(idx); }}
+                                disabled={checkingBrowseIndex !== null}
+                                className="absolute right-1.5 top-1/2 -translate-y-1/2 inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--bg-soft)] px-2 py-1 text-[10px] text-[var(--text)] hover:brightness-95 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                              >
+                                {checkingBrowseIndex === idx ? <Loader2 size={10} className="animate-spin" /> : null}
+                                {t('provisioning.hostPathBrowseButton')}
+                              </button>
+                            )}
                         </div>
                         <button
                             onClick={() => handleRemoveMount(idx)}

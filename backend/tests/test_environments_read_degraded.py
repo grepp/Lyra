@@ -114,6 +114,7 @@ def test_read_environments_handles_per_environment_docker_failures(monkeypatch):
     result = asyncio.run(env_router.read_environments(skip=0, limit=100, db=db))
 
     assert len(result) == 2
-    assert env_ok.status == "running"
+    by_name = {row["name"]: row for row in result}
+    assert by_name["ok-env"]["status"] == "running"
     assert env_fail.status == "running"
-    assert db.commit_called is True
+    assert db.commit_called is False
