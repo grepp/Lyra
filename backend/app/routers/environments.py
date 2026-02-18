@@ -834,7 +834,7 @@ async def read_environments(skip: int = 0, limit: int = 100, db: AsyncSession = 
             if not worker:
                 env_dict = {
                     **env.__dict__,
-                    "status": response_status,
+                    "status": "unknown",
                     "worker_server_name": None,
                     "worker_server_base_url": None,
                     "worker_error_code": "worker_not_found",
@@ -856,7 +856,7 @@ async def read_environments(skip: int = 0, limit: int = 100, db: AsyncSession = 
             if not healthy:
                 env_dict = {
                     **env.__dict__,
-                    "status": response_status,
+                    "status": "unknown",
                     "worker_server_name": worker.name,
                     "worker_server_base_url": worker.base_url,
                     "worker_error_code": f"worker_health_{worker.last_health_status}",
@@ -881,6 +881,7 @@ async def read_environments(skip: int = 0, limit: int = 100, db: AsyncSession = 
                 if isinstance(container_id, str) and len(container_id) > 12:
                     container_id = container_id[:12]
             except WorkerRequestError as error:
+                response_status = "unknown"
                 worker_error_code = error.code
                 worker_error_message = error.message
                 container_id = None
@@ -975,9 +976,11 @@ async def read_environment(environment_id: str, db: AsyncSession = Depends(get_d
                 remote_status = str(remote_env.get("status") or env.status)
                 response_status = remote_status
             except WorkerRequestError as error:
+                response_status = "unknown"
                 worker_error_code = error.code
                 worker_error_message = error.message
         else:
+            response_status = "unknown"
             worker_error_code = "worker_not_found"
             worker_error_message = "Worker server not found"
 

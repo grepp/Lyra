@@ -910,6 +910,7 @@ export default function Dashboard() {
                                                 : 'bg-gray-500/10 text-gray-400')
                                               : env.status === 'running' ? 'bg-green-500/10 text-green-500' :
                                                 env.status === 'stopped' ? 'bg-yellow-500/10 text-yellow-500' :
+                                                env.status === 'unknown' ? 'bg-gray-500/10 text-gray-400' :
                                                 env.status === 'creating' ? 'bg-blue-500/10 text-blue-500' :
                                                 env.status === 'building' ? 'bg-blue-500/10 text-blue-500' :
                                                 env.status === 'starting' ? 'bg-gray-500/10 text-gray-400' :
