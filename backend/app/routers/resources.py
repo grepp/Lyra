@@ -29,8 +29,13 @@ async def get_gpu_resources(db: AsyncSession = Depends(get_db)):
         pass
 
     # 2. Get Used GPUs from Database
-    # Find environments that are 'running' or 'building'
-    result = await db.execute(select(Environment).where(Environment.status.in_(["running", "building"])))
+    # Host resource view must exclude worker-bound environments.
+    result = await db.execute(
+        select(Environment).where(
+            Environment.status.in_(["running", "building"]),
+            Environment.worker_server_id.is_(None),
+        )
+    )
     active_envs = result.scalars().all()
 
     used_indices = set()
