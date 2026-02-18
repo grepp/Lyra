@@ -498,62 +498,83 @@ async def create_environment(env: EnvironmentCreate, db: AsyncSession = Depends(
                 detail={"code": "worker_api_mismatch", "message": "Worker response did not include a valid id"},
             ) from error
 
+        async def _cleanup_remote_environment() -> None:
+            try:
+                await call_worker_api(
+                    worker,
+                    method="DELETE",
+                    path=f"/api/worker/environments/{remote_env_id}",
+                )
+            except WorkerRequestError as cleanup_error:
+                logger.warning(
+                    "Failed to cleanup remote worker environment %s after local create failure: %s",
+                    remote_env_id,
+                    cleanup_error,
+                )
+
         gpu_indices = [int(idx) for idx in (remote_env.get("gpu_indices") or env.selected_gpu_indices or [])]
         custom_ports = _normalize_custom_ports(remote_env.get("custom_ports") or env.custom_ports)
         _validate_custom_ports(custom_ports)
 
-        created_env = None
-        for _ in range(MAX_PORT_ALLOCATION_RETRIES):
-            try:
-                async with db.begin():
-                    surrogate_ssh_port, surrogate_jupyter_port, surrogate_code_port = (
-                        await _allocate_remote_surrogate_ports(db)
-                    )
-                    created_env = Environment(
-                        id=remote_env_id,
-                        name=env.name,
-                        worker_server_id=worker.id,
-                        container_user=env.container_user,
-                        root_password="__redacted__",
-                        root_password_encrypted=encrypted_root_password,
-                        dockerfile_content=env.dockerfile_content,
-                        enable_jupyter=env.enable_jupyter,
-                        enable_code_server=env.enable_code_server,
-                        mount_config=[m.model_dump() for m in env.mount_config],
-                        gpu_indices=gpu_indices,
-                        ssh_port=surrogate_ssh_port,
-                        jupyter_port=surrogate_jupyter_port,
-                        code_port=surrogate_code_port,
-                        status=str(remote_env.get("status") or "building"),
-                    )
-                    db.add(created_env)
-                    db.add(Setting(key=f"custom_ports:{created_env.id}", value=json.dumps(custom_ports)))
-                    await db.flush()
-                break
-            except IntegrityError as error:
-                await db.rollback()
-                created_env = None
-                if _is_name_unique_violation(error):
-                    raise HTTPException(
-                        status_code=409,
-                        detail={"code": "duplicate_environment_name", "message": "Environment name already exists"},
-                    ) from error
-                if _is_port_unique_violation(error):
-                    continue
-                raise
+        # Ensure a clean transaction boundary before begin() retries.
+        await db.rollback()
 
-        if created_env is None:
-            raise HTTPException(
-                status_code=503,
-                detail={
-                    "code": "port_allocation_failed",
-                    "message": "Failed to allocate unique ports after several retries. Please try again.",
-                },
-            )
+        try:
+            created_env = None
+            for _ in range(MAX_PORT_ALLOCATION_RETRIES):
+                try:
+                    async with db.begin():
+                        surrogate_ssh_port, surrogate_jupyter_port, surrogate_code_port = (
+                            await _allocate_remote_surrogate_ports(db)
+                        )
+                        created_env = Environment(
+                            id=remote_env_id,
+                            name=env.name,
+                            worker_server_id=worker.id,
+                            container_user=env.container_user,
+                            root_password="__redacted__",
+                            root_password_encrypted=encrypted_root_password,
+                            dockerfile_content=env.dockerfile_content,
+                            enable_jupyter=env.enable_jupyter,
+                            enable_code_server=env.enable_code_server,
+                            mount_config=[m.model_dump() for m in env.mount_config],
+                            gpu_indices=gpu_indices,
+                            ssh_port=surrogate_ssh_port,
+                            jupyter_port=surrogate_jupyter_port,
+                            code_port=surrogate_code_port,
+                            status=str(remote_env.get("status") or "building"),
+                        )
+                        db.add(created_env)
+                        db.add(Setting(key=f"custom_ports:{created_env.id}", value=json.dumps(custom_ports)))
+                        await db.flush()
+                    break
+                except IntegrityError as error:
+                    await db.rollback()
+                    created_env = None
+                    if _is_name_unique_violation(error):
+                        raise HTTPException(
+                            status_code=409,
+                            detail={"code": "duplicate_environment_name", "message": "Environment name already exists"},
+                        ) from error
+                    if _is_port_unique_violation(error):
+                        continue
+                    raise
 
-        env_dict = {**created_env.__dict__, "custom_ports": custom_ports}
-        env_dict.pop("_sa_instance_state", None)
-        return env_dict
+            if created_env is None:
+                raise HTTPException(
+                    status_code=503,
+                    detail={
+                        "code": "port_allocation_failed",
+                        "message": "Failed to allocate unique ports after several retries. Please try again.",
+                    },
+                )
+
+            env_dict = {**created_env.__dict__, "custom_ports": custom_ports}
+            env_dict.pop("_sa_instance_state", None)
+            return env_dict
+        except Exception:
+            await _cleanup_remote_environment()
+            raise
 
     # GPU allocation logic
     gpu_indices: list[int] = []

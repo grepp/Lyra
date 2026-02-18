@@ -1,5 +1,6 @@
 import asyncio
 import uuid
+from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
@@ -203,3 +204,58 @@ def test_create_environment_rolls_back_rows_when_enqueue_fails(monkeypatch):
     assert exc.value.status_code == 503
     assert exc.value.detail["code"] == "task_enqueue_failed"
     assert db.rollback_called >= 1
+
+
+def test_worker_create_environment_cleans_up_remote_when_local_persist_fails(monkeypatch):
+    db = _FakeDb()
+    worker_id = uuid.uuid4()
+    remote_env_id = uuid.uuid4()
+    payload = EnvironmentCreate(
+        name="txn-worker-cleanup-test",
+        worker_server_id=worker_id,
+        container_user="root",
+        root_password="pw",
+        dockerfile_content="FROM python:3.11-slim\nRUN echo ok\n",
+        mount_config=[],
+        custom_ports=[],
+        gpu_count=0,
+        selected_gpu_indices=[],
+        enable_jupyter=True,
+        enable_code_server=True,
+    )
+
+    async def _fake_assert_worker_ready(_db, _worker_id):
+        return SimpleNamespace(id=worker_id)
+
+    cleanup_calls: list[str] = []
+
+    async def _fake_call_worker_api(worker, *, method, path, payload=None, timeout=None):
+        del worker, payload, timeout
+        if method == "POST" and path == "/api/worker/environments":
+            return {
+                "id": str(remote_env_id),
+                "status": "building",
+                "gpu_indices": [],
+                "custom_ports": [],
+            }
+        if method == "DELETE" and path == f"/api/worker/environments/{remote_env_id}":
+            cleanup_calls.append(path)
+            return {"status": "deleted"}
+        raise AssertionError(f"unexpected worker api call: {method} {path}")
+
+    async def _fake_allocate_remote_surrogate_ports(_db):
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "port_allocation_failed", "message": "simulated"},
+        )
+
+    monkeypatch.setattr(env_router, "_assert_worker_is_ready", _fake_assert_worker_ready)
+    monkeypatch.setattr(env_router, "call_worker_api", _fake_call_worker_api)
+    monkeypatch.setattr(env_router, "_allocate_remote_surrogate_ports", _fake_allocate_remote_surrogate_ports)
+    monkeypatch.setattr(env_router, "encrypt_secret", lambda _v: "encrypted-secret")
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(env_router.create_environment(payload, db=db))
+
+    assert exc.value.status_code == 503
+    assert cleanup_calls == [f"/api/worker/environments/{remote_env_id}"]
