@@ -29,6 +29,7 @@ import random
 import logging
 from sqlalchemy.exc import IntegrityError
 import json
+from urllib.parse import urlsplit, urlunsplit
 
 router = APIRouter(
     prefix="/environments",
@@ -93,6 +94,51 @@ def _cleanup_expired_code_tickets():
     ]
     for ticket in expired:
         code_launch_tickets.pop(ticket, None)
+
+
+def _build_worker_service_url(base_url: str, service_port: int, launch_path: str) -> str:
+    parsed_base = urlsplit(str(base_url or "").strip())
+    parsed_launch = urlsplit(str(launch_path or "").strip())
+
+    base_path = (parsed_base.path or "").rstrip("/")
+    launch_only_path = parsed_launch.path or "/"
+    if not launch_only_path.startswith("/"):
+        launch_only_path = f"/{launch_only_path}"
+    combined_path = f"{base_path}{launch_only_path}" if base_path else launch_only_path
+
+    if parsed_base.scheme and parsed_base.hostname:
+        hostname = parsed_base.hostname
+        # Bracket IPv6 hostnames when building netloc manually.
+        if ":" in hostname and not hostname.startswith("["):
+            hostname = f"[{hostname}]"
+        host_with_port = hostname if service_port <= 0 else f"{hostname}:{service_port}"
+        if parsed_base.username:
+            auth = parsed_base.username
+            if parsed_base.password:
+                auth = f"{auth}:{parsed_base.password}"
+            netloc = f"{auth}@{host_with_port}"
+        else:
+            netloc = host_with_port
+        return urlunsplit((parsed_base.scheme, netloc, combined_path, parsed_launch.query, parsed_launch.fragment))
+
+    normalized = str(base_url or "").rstrip("/")
+    suffix = combined_path
+    if parsed_launch.query:
+        suffix = f"{suffix}?{parsed_launch.query}"
+    if parsed_launch.fragment:
+        suffix = f"{suffix}#{parsed_launch.fragment}"
+    return f"{normalized}{suffix}"
+
+
+def _parse_worker_service_port(raw_port) -> int | None:
+    if isinstance(raw_port, int):
+        return raw_port if raw_port > 0 else None
+    if isinstance(raw_port, str):
+        value = raw_port.strip()
+        if value.isdigit():
+            parsed = int(value)
+            return parsed if parsed > 0 else None
+    return None
 
 
 def _format_container_state_summary(container) -> str:
@@ -1039,12 +1085,15 @@ async def create_jupyter_launch_url(environment_id: str, db: AsyncSession = Depe
             raise _map_worker_request_error(error) from error
 
         remote_launch_path = str(worker_launch.get("launch_url") or "").strip()
+        worker_service_port = _parse_worker_service_port(worker_launch.get("port"))
         if not remote_launch_path:
             raise HTTPException(
                 status_code=502,
                 detail={"code": "worker_api_mismatch", "message": "Worker launch URL response is invalid"},
             )
-        if remote_launch_path.startswith("http://") or remote_launch_path.startswith("https://"):
+        if worker_service_port is not None:
+            remote_launch_url = _build_worker_service_url(worker.base_url, worker_service_port, remote_launch_path)
+        elif remote_launch_path.startswith("http://") or remote_launch_path.startswith("https://"):
             remote_launch_url = remote_launch_path
         else:
             base_url = str(worker.base_url or "").rstrip("/")
@@ -1142,12 +1191,15 @@ async def create_code_launch_url(environment_id: str, db: AsyncSession = Depends
             raise _map_worker_request_error(error) from error
 
         remote_launch_path = str(worker_launch.get("launch_url") or "").strip()
+        worker_service_port = _parse_worker_service_port(worker_launch.get("port"))
         if not remote_launch_path:
             raise HTTPException(
                 status_code=502,
                 detail={"code": "worker_api_mismatch", "message": "Worker launch URL response is invalid"},
             )
-        if remote_launch_path.startswith("http://") or remote_launch_path.startswith("https://"):
+        if worker_service_port is not None:
+            remote_launch_url = _build_worker_service_url(worker.base_url, worker_service_port, remote_launch_path)
+        elif remote_launch_path.startswith("http://") or remote_launch_path.startswith("https://"):
             remote_launch_url = remote_launch_path
         else:
             base_url = str(worker.base_url or "").rstrip("/")

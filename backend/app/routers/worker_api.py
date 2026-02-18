@@ -1,8 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from ..core.worker_auth import require_worker_api_auth, require_worker_role
 from ..database import get_db
+from ..models import Environment
 from ..routers import environments as env_router
 from ..routers import resources as resource_router
 from ..schemas import EnvironmentCreate
@@ -64,9 +66,31 @@ async def worker_delete_environment(environment_id: str, db: AsyncSession = Depe
 
 @router.post("/environments/{environment_id}/jupyter/launch")
 async def worker_create_jupyter_launch_url(environment_id: str, db: AsyncSession = Depends(get_db)):
-    return await env_router.create_jupyter_launch_url(environment_id=environment_id, db=db)
+    result = await db.execute(select(Environment).where(Environment.id == environment_id))
+    env = result.scalars().first()
+    if env is None:
+        raise HTTPException(status_code=404, detail="Environment not found")
+    if not env.enable_jupyter:
+        raise HTTPException(status_code=409, detail="Jupyter is disabled for this environment")
+    if env.status != "running":
+        raise HTTPException(status_code=409, detail="Environment must be running")
+
+    token = await env_router._get_jupyter_token(db, str(env.id))
+    if not token:
+        raise HTTPException(status_code=409, detail="Jupyter token is not configured. Recreate the environment.")
+
+    return {"launch_url": f"/?token={token}", "port": env.jupyter_port}
 
 
 @router.post("/environments/{environment_id}/code/launch")
 async def worker_create_code_launch_url(environment_id: str, db: AsyncSession = Depends(get_db)):
-    return await env_router.create_code_launch_url(environment_id=environment_id, db=db)
+    result = await db.execute(select(Environment).where(Environment.id == environment_id))
+    env = result.scalars().first()
+    if env is None:
+        raise HTTPException(status_code=404, detail="Environment not found")
+    if not env.enable_code_server:
+        raise HTTPException(status_code=409, detail="code-server is disabled for this environment")
+    if env.status != "running":
+        raise HTTPException(status_code=409, detail="Environment must be running")
+
+    return {"launch_url": "/", "port": env.code_port}
