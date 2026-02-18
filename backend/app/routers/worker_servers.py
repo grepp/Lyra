@@ -301,14 +301,22 @@ async def cleanup_worker_orphans(worker_id: str, db: AsyncSession = Depends(get_
             )
             removed.append(orphan_id)
         except WorkerRequestError as error:
+            is_not_found = error.status_code == 404 or error.code in {"environment_not_found", "worker_environment_not_found"}
+            if is_not_found:
+                removed.append(orphan_id)
+                continue
             skipped.append({"id": orphan_id, "code": error.code, "message": error.message})
 
     return {
         "status": "ok",
-        "removed_count": len(removed),
-        "skipped_count": len(skipped),
-        "removed_ids": removed,
-        "skipped": skipped,
+        "code": "ok",
+        "message": "Worker orphan cleanup completed",
+        "data": {
+            "removed_count": len(removed),
+            "skipped_count": len(skipped),
+            "removed_ids": removed,
+            "skipped": skipped,
+        },
     }
 
 

@@ -729,11 +729,12 @@ export default function Settings() {
     try {
       setWorkerStatus({ type: 'loading', message: t('feedback.settings.workerOrphanCleanupRunning') });
       const res = await axios.post(`worker-servers/${worker.id}/orphans/cleanup`);
+      const cleanupData = res.data?.data || {};
       setWorkerStatus({
         type: 'success',
         message: t('feedback.settings.workerOrphanCleanupResult', {
-          removed: Number(res.data?.removed_count || 0),
-          skipped: Number(res.data?.skipped_count || 0),
+          removed: Number(cleanupData?.removed_count || 0),
+          skipped: Number(cleanupData?.skipped_count || 0),
         }),
       });
       await loadWorkerOrphanCounts(workerServers);

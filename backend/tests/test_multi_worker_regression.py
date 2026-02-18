@@ -186,6 +186,30 @@ def test_read_environment_worker_error_payload(monkeypatch):
     assert db.commit_called is False
 
 
+def test_read_environment_local_includes_container_id(monkeypatch):
+    env = _env("local-env", "running")
+    db = _FakeDb(envs=[env], workers=[])
+
+    class _Container:
+        short_id = "1234567890abcdef"
+        id = "1234567890abcdef"
+
+    class _ContainerStore:
+        def get(self, name):
+            assert name == f"lyra-{env.name}-{env.id}"
+            return _Container()
+
+    class _DockerClient:
+        containers = _ContainerStore()
+
+    monkeypatch.setattr(env_router.docker, "from_env", lambda: _DockerClient())
+
+    result = asyncio.run(env_router.read_environment(environment_id=str(env.id), db=db))
+
+    assert result["container_id"] == "1234567890ab"
+    assert result["status"] == "running"
+
+
 def test_worker_gpu_proxy_maps_worker_error(monkeypatch):
     worker = _worker("gpu-worker")
     db = _FakeDb(workers=[worker])
@@ -208,3 +232,32 @@ def test_worker_gpu_proxy_maps_worker_error(monkeypatch):
     http_exc = exc.value
     assert getattr(http_exc, "status_code", None) == 502
     assert getattr(http_exc, "detail", {}).get("code") == "worker_auth_failed"
+
+
+def test_cleanup_worker_orphans_treats_not_found_as_removed(monkeypatch):
+    worker = _worker("orphan-worker")
+    db = _FakeDb(workers=[worker])
+
+    async def _fake_assert_ready(_db, worker_id):
+        assert str(worker_id) == str(worker.id)
+        return worker
+
+    async def _fake_get_orphans(_db, _worker):
+        return ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]
+
+    async def _fake_call_worker_api(_worker, *, method, path, payload=None, timeout=None):
+        assert method == "DELETE"
+        if path.endswith("11111111-1111-1111-1111-111111111111"):
+            raise WorkerRequestError("environment_not_found", "Environment not found", status_code=404)
+        return {}
+
+    monkeypatch.setattr(worker_servers_router, "_assert_worker_ready", _fake_assert_ready)
+    monkeypatch.setattr(worker_servers_router, "_get_worker_orphan_environment_ids", _fake_get_orphans)
+    monkeypatch.setattr(worker_servers_router, "call_worker_api", _fake_call_worker_api)
+
+    result = asyncio.run(worker_servers_router.cleanup_worker_orphans(worker_id=str(worker.id), db=db))
+
+    assert result["status"] == "ok"
+    assert result["code"] == "ok"
+    assert result["data"]["removed_count"] == 2
+    assert result["data"]["skipped_count"] == 0

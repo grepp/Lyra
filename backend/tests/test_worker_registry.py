@@ -254,3 +254,32 @@ def test_call_worker_api_propagates_worker_http_error_payload(monkeypatch):
 
     assert exc_info.value.status_code == 404
     assert exc_info.value.code == "environment_not_found"
+
+
+def test_call_worker_api_preserves_auth_http_status(monkeypatch):
+    worker = WorkerServer(
+        id=uuid.uuid4(),
+        name="worker-1",
+        base_url="http://worker.local",
+        api_token_encrypted="enc",
+    )
+
+    def _fake_build(_worker):
+        return worker_registry.WorkerConnectionConfig(
+            id=str(_worker.id),
+            name=_worker.name,
+            base_url=_worker.base_url,
+            api_token="token",
+        )
+
+    async def _fake_request(**_kwargs):
+        return 401, {"detail": "Invalid worker API token"}
+
+    monkeypatch.setattr(worker_registry, "build_worker_connection_config", _fake_build)
+    monkeypatch.setattr(worker_registry, "_request_worker_json", _fake_request)
+
+    with pytest.raises(worker_registry.WorkerRequestError) as exc_info:
+        asyncio.run(worker_registry.call_worker_api(worker, method="GET", path="/api/worker/health"))
+
+    assert exc_info.value.code == "worker_auth_failed"
+    assert exc_info.value.status_code == 401

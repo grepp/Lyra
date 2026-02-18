@@ -197,7 +197,12 @@ async def check_worker_health(config: WorkerConnectionConfig, timeout: float | N
             latency_ms=latency_ms,
         )
 
-    if payload.get("status") != "ok" or payload.get("role") != "worker":
+    if str(payload.get("status") or "").lower() == "ok" and isinstance(payload.get("data"), dict):
+        role = str(payload.get("data", {}).get("role") or "").strip()
+    else:
+        role = str(payload.get("role") or "").strip()
+
+    if role != "worker":
         return WorkerHealthResult(
             status=WORKER_HEALTH_API_MISMATCH,
             message="Worker health payload mismatch",
@@ -308,7 +313,7 @@ async def call_worker_api(
         body = {}
 
     if http_status in {401, 403}:
-        raise WorkerRequestError("worker_auth_failed", "Worker authentication failed", status_code=502)
+        raise WorkerRequestError("worker_auth_failed", "Worker authentication failed", status_code=http_status)
     if http_status >= 400:
         error_code = "worker_request_failed"
         detail = ""
@@ -329,6 +334,16 @@ async def call_worker_api(
         if not detail:
             detail = f"Worker responded with status {http_status}"
         raise WorkerRequestError(error_code, detail, status_code=http_status)
+
+    # Normalize worker success envelope: {"status":"ok","code":"ok","message":"...","data":{...}}
+    if isinstance(body, dict) and "data" in body and str(body.get("status") or "").lower() == "ok":
+        payload = body.get("data")
+        if payload is None:
+            return {}
+        if isinstance(payload, dict):
+            return payload
+        raise WorkerRequestError("worker_api_mismatch", "Worker response data payload is invalid", status_code=502)
+
     if not isinstance(body, dict):
         raise WorkerRequestError("worker_api_mismatch", "Worker response payload is invalid", status_code=502)
 

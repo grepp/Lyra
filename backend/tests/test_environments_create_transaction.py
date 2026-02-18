@@ -264,3 +264,82 @@ def test_worker_create_environment_cleans_up_remote_when_local_persist_fails(mon
 
     assert exc.value.status_code == 503
     assert cleanup_calls == [f"/api/worker/environments/{remote_env_id}"]
+
+
+def test_worker_delete_environment_reports_local_cleanup_failure_after_remote_success(monkeypatch):
+    worker_id = uuid.uuid4()
+    env_id = uuid.uuid4()
+
+    env = Environment(
+        id=env_id,
+        name="txn-worker-delete-local-fail",
+        worker_server_id=worker_id,
+        container_user="root",
+        root_password="__redacted__",
+        root_password_encrypted="encrypted-secret",
+        dockerfile_content="FROM python:3.11-slim\nRUN echo ok\n",
+        enable_jupyter=True,
+        enable_code_server=True,
+        mount_config=[],
+        gpu_indices=[],
+        ssh_port=20001,
+        jupyter_port=25001,
+        code_port=30001,
+        status="running",
+    )
+
+    class _DeleteDb:
+        def __init__(self):
+            self.rollback_called = 0
+
+        async def execute(self, stmt, *_args, **_kwargs):
+            sql = str(stmt)
+            if "FROM environments" in sql:
+                return _ExecuteResult([env])
+            if "FROM settings" in sql:
+                return _ExecuteResult([])
+            return _ExecuteResult([])
+
+        async def delete(self, obj):
+            if isinstance(obj, Environment):
+                raise RuntimeError("simulated local delete failure")
+            return None
+
+        async def commit(self):
+            return None
+
+        async def rollback(self):
+            self.rollback_called += 1
+
+    db = _DeleteDb()
+
+    async def _fake_assert_worker_ready(_db, _worker_id):
+        return SimpleNamespace(
+            id=worker_id,
+            name="worker-test",
+            base_url="http://worker.test:8000",
+            api_token_encrypted="encrypted-token",
+        )
+
+    remote_calls: list[tuple[str, str]] = []
+
+    async def _fake_call_worker_api(worker, *, method, path, payload=None, timeout=None):
+        del worker, payload, timeout
+        remote_calls.append((method, path))
+        return {}
+
+    monkeypatch.setattr(env_router, "_assert_worker_is_ready", _fake_assert_worker_ready)
+    monkeypatch.setattr(env_router, "call_worker_api", _fake_call_worker_api)
+    monkeypatch.setattr(
+        env_router.docker,
+        "from_env",
+        lambda: (_ for _ in ()).throw(RuntimeError("local docker unavailable")),
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(env_router.delete_environment(environment_id=env_id, force=False, db=db))
+
+    assert exc.value.status_code == 500
+    assert exc.value.detail["code"] == "local_cleanup_failed"
+    assert remote_calls == [("DELETE", f"/api/worker/environments/{env_id}")]
+    assert db.rollback_called >= 1

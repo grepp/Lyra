@@ -1013,6 +1013,7 @@ async def read_environment(environment_id: str, db: AsyncSession = Depends(get_d
     worker_error_code = None
     worker_error_message = None
     response_status = env.status
+    container_id: str | None = None
 
     if env.worker_server_id:
         worker = await _get_worker_server_by_id(db, env.worker_server_id)
@@ -1027,6 +1028,9 @@ async def read_environment(environment_id: str, db: AsyncSession = Depends(get_d
                 )
                 remote_status = str(remote_env.get("status") or env.status)
                 response_status = remote_status
+                remote_container_id = remote_env.get("container_id")
+                if isinstance(remote_container_id, str) and remote_container_id.strip():
+                    container_id = remote_container_id[:12]
             except WorkerRequestError as error:
                 response_status = "unknown"
                 worker_error_code = error.code
@@ -1035,6 +1039,19 @@ async def read_environment(environment_id: str, db: AsyncSession = Depends(get_d
             response_status = "unknown"
             worker_error_code = "worker_not_found"
             worker_error_message = "Worker server not found"
+    else:
+        container_name = f"lyra-{env.name}-{env.id}"
+        try:
+            client = docker.from_env()
+            container = client.containers.get(container_name)
+            container_id = container.short_id or (container.id[:12] if container.id else None)
+            if isinstance(container_id, str) and len(container_id) > 12:
+                container_id = container_id[:12]
+        except docker.errors.NotFound:
+            container_id = None
+        except Exception as error:
+            logger.warning("Failed to resolve container id for environment %s: %s", env.id, error)
+            container_id = None
 
     custom_ports = await _get_custom_ports_for_environment(db, str(env.id))
     env_dict = {
@@ -1045,6 +1062,7 @@ async def read_environment(environment_id: str, db: AsyncSession = Depends(get_d
         "worker_server_base_url": worker_server_base_url,
         "worker_error_code": worker_error_code,
         "worker_error_message": worker_error_message,
+        "container_id": container_id,
     }
     env_dict.pop("_sa_instance_state", None)
     return env_dict
@@ -1309,7 +1327,9 @@ async def delete_environment(
     if env is None:
         raise HTTPException(status_code=404, detail="Environment not found")
 
+    remote_delete_completed = False
     if env.worker_server_id:
+        logger.info("Delete stage(remote) started for environment %s on worker %s", env.id, env.worker_server_id)
         if force:
             worker = await _get_worker_server_by_id(db, env.worker_server_id)
             if worker:
@@ -1319,6 +1339,7 @@ async def delete_environment(
                         method="DELETE",
                         path=f"/api/worker/environments/{env.id}",
                     )
+                    remote_delete_completed = True
                 except WorkerRequestError:
                     # Force delete should still allow local cleanup for orphaned environments.
                     pass
@@ -1330,6 +1351,7 @@ async def delete_environment(
                     method="DELETE",
                     path=f"/api/worker/environments/{env.id}",
                 )
+                remote_delete_completed = True
             except WorkerRequestError as error:
                 # Treat "already missing on worker" as idempotent success and continue local cleanup.
                 if _is_worker_environment_not_found(error):
@@ -1337,6 +1359,7 @@ async def delete_environment(
                         "Worker environment %s was already missing during delete; continuing local cleanup.",
                         env.id,
                     )
+                    remote_delete_completed = True
                 else:
                     # In some race cases, delete can fail but the environment is already gone on worker.
                     if await _is_worker_environment_absent(worker, str(env.id)):
@@ -1344,6 +1367,7 @@ async def delete_environment(
                             "Worker environment %s not found after delete error; continuing local cleanup.",
                             env.id,
                         )
+                        remote_delete_completed = True
                     else:
                         raise _map_worker_request_error(error) from error
 
@@ -1366,20 +1390,36 @@ async def delete_environment(
             ) from e
         logger.warning("Error removing local container while deleting worker-bound environment: %s", e)
 
-    token_key = f"jupyter_token:{env.id}"
-    token_result = await db.execute(select(Setting).where(Setting.key == token_key))
-    token_setting = token_result.scalars().first()
-    if token_setting:
-        await db.delete(token_setting)
+    logger.info("Delete stage(local-db) started for environment %s", env.id)
+    try:
+        token_key = f"jupyter_token:{env.id}"
+        token_result = await db.execute(select(Setting).where(Setting.key == token_key))
+        token_setting = token_result.scalars().first()
+        if token_setting:
+            await db.delete(token_setting)
 
-    custom_ports_key = f"custom_ports:{env.id}"
-    custom_ports_result = await db.execute(select(Setting).where(Setting.key == custom_ports_key))
-    custom_ports_setting = custom_ports_result.scalars().first()
-    if custom_ports_setting:
-        await db.delete(custom_ports_setting)
+        custom_ports_key = f"custom_ports:{env.id}"
+        custom_ports_result = await db.execute(select(Setting).where(Setting.key == custom_ports_key))
+        custom_ports_setting = custom_ports_result.scalars().first()
+        if custom_ports_setting:
+            await db.delete(custom_ports_setting)
 
-    await db.delete(env)
-    await db.commit()
+        await db.delete(env)
+        await db.commit()
+    except Exception as error:
+        await db.rollback()
+        logger.exception("Delete stage(local-db) failed for environment %s: %s", env.id, error)
+        if env.worker_server_id and remote_delete_completed:
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "code": "local_cleanup_failed",
+                    "message": "Worker environment was deleted, but local cleanup failed. Retry delete with force.",
+                },
+            ) from error
+        raise
+
+    logger.info("Delete completed for environment %s", env.id)
     _cleanup_expired_jupyter_tickets()
     _cleanup_expired_code_tickets()
 
