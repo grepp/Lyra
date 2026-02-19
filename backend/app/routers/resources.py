@@ -144,16 +144,51 @@ async def prune_unused_images(payload: dict):
 
         removed = []
         skipped = []
-        for image_id in target_ids:
+
+        remaining = set(target_ids)
+        last_errors = {}
+
+        # Remove in multiple passes so dependency-ordered images can be deleted
+        # after their child images are removed in earlier iterations.
+        while remaining:
+            removed_this_round = 0
+            for image_id in list(remaining):
+                image_meta = candidate_map.get(image_id)
+                if not image_meta:
+                    skipped.append({"id": image_id, "reason": "Not an unused image candidate"})
+                    remaining.remove(image_id)
+                    continue
+
+                try:
+                    client.images.remove(image=image_id, force=False, noprune=False)
+                    removed.append(image_meta)
+                    remaining.remove(image_id)
+                    removed_this_round += 1
+                    last_errors.pop(image_id, None)
+                except Exception as e:
+                    last_errors[image_id] = str(e)
+
+            if removed_this_round == 0:
+                break
+
+        # Retry remaining images with force=True. Some tagged images can still be
+        # removable only when Docker requires a forced untag/remove flow.
+        for image_id in list(remaining):
             image_meta = candidate_map.get(image_id)
             if not image_meta:
                 skipped.append({"id": image_id, "reason": "Not an unused image candidate"})
+                remaining.remove(image_id)
                 continue
             try:
-                client.images.remove(image=image_id, force=False, noprune=False)
+                client.images.remove(image=image_id, force=True, noprune=False)
                 removed.append(image_meta)
+                remaining.remove(image_id)
+                last_errors.pop(image_id, None)
             except Exception as e:
-                skipped.append({"id": image_id, "reason": str(e)})
+                last_errors[image_id] = str(e)
+
+        for image_id in sorted(remaining):
+            skipped.append({"id": image_id, "reason": last_errors.get(image_id, "Failed to remove image")})
 
         return {
             "mode": mode,
