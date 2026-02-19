@@ -101,11 +101,18 @@ const buildManagedBlocks = (enableJupyter: boolean, enableCodeServer: boolean): 
       '      (command -v dnf >/dev/null 2>&1 && dnf install -y python3 python3-pip) || \\',
       '      (command -v yum >/dev/null 2>&1 && yum install -y python3 python3-pip); \\',
       '    fi && \\',
+      '    if command -v python3 >/dev/null 2>&1 && ! python3 -m pip --version >/dev/null 2>&1; then \\',
+      '      python3 -m ensurepip --upgrade >/dev/null 2>&1 || true; \\',
+      '    fi && \\',
+      '    if command -v python3 >/dev/null 2>&1 && ! python3 -m pip --version >/dev/null 2>&1; then \\',
+      "      python3 -c \"import urllib.request; urllib.request.urlretrieve('https://bootstrap.pypa.io/get-pip.py','/tmp/get-pip.py')\" && \\",
+      '      python3 /tmp/get-pip.py --disable-pip-version-check && rm -f /tmp/get-pip.py || true; \\',
+      '    fi && \\',
       '    if ! command -v python3 >/dev/null 2>&1 || ! python3 -m pip --version >/dev/null 2>&1; then \\',
       "      echo 'python3/pip are required for jupyterlab installation but were not found after package install attempts' >&2; \\",
       '      exit 1; \\',
       '    fi && \\',
-      '    python3 -m pip install --no-cache-dir jupyterlab',
+      '    python3 -m pip install --break-system-packages --no-cache-dir jupyterlab',
       `${MANAGED_JUPYTER_END}`
     );
   }
