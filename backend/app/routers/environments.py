@@ -1687,18 +1687,70 @@ async def reset_environment_root_password(
         raise HTTPException(status_code=404, detail="Environment not found")
 
     if env.worker_server_id:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "worker_reset_not_supported",
-                "message": "Root password reset for worker environments is not supported on this endpoint",
-            },
-        )
+        worker = await _assert_worker_is_ready(db, env.worker_server_id)
+        new_password = _validate_new_root_password(payload.new_password)
+        previous_encrypted_password = env.root_password_encrypted
+        try:
+            encrypted_password = encrypt_secret(new_password)
+        except (SecretKeyError, SecretCipherError) as error:
+            raise HTTPException(
+                status_code=500,
+                detail={"code": "password_encryption_failed", "message": str(error)},
+            ) from error
+        try:
+            response = await call_worker_api(
+                worker,
+                method="POST",
+                path=f"/api/worker/environments/{env.id}/accounts/root/reset-password",
+                payload={"new_password": new_password},
+            )
+        except WorkerRequestError as error:
+            raise _map_worker_request_error(error) from error
+
+        env.root_password = "__redacted__"
+        env.root_password_encrypted = encrypted_password
+        try:
+            await db.commit()
+        except Exception as error:
+            try:
+                await db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+            restored = False
+            if previous_encrypted_password:
+                try:
+                    previous_password = decrypt_secret(previous_encrypted_password)
+                    await call_worker_api(
+                        worker,
+                        method="POST",
+                        path=f"/api/worker/environments/{env.id}/accounts/root/reset-password",
+                        payload={"new_password": previous_password},
+                    )
+                    restored = True
+                except Exception as rollback_error:  # noqa: BLE001
+                    logger.warning(
+                        "Failed to rollback worker root password change for environment %s after DB commit error: %s",
+                        env.id,
+                        rollback_error,
+                    )
+            logger.warning("Failed to persist worker root password metadata for environment %s: %s", env.id, error)
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "code": "password_metadata_sync_failed",
+                    "message": (
+                        "Failed to persist root password metadata"
+                        if restored
+                        else "Failed to persist root password metadata (manual verification required)"
+                    ),
+                },
+            ) from error
+        return response if isinstance(response, dict) else {"message": "Root password updated"}
 
     if env.status != "running" and not _is_host_environment_running_now(env):
         raise HTTPException(
             status_code=409,
-            detail={"code": "environment_not_running", "message": "Environment must be running"},
+            detail={"code": "env_not_running", "message": "Environment must be running"},
         )
 
     new_password = _validate_new_root_password(payload.new_password)
@@ -1719,7 +1771,7 @@ async def reset_environment_root_password(
         if container.status != "running":
             raise HTTPException(
                 status_code=409,
-                detail={"code": "environment_not_running", "message": "Environment must be running"},
+                detail={"code": "env_not_running", "message": "Environment must be running"},
             )
 
         exec_id = client.api.exec_create(
@@ -1739,7 +1791,7 @@ async def reset_environment_root_password(
         if exit_code is None or int(exit_code) != 0:
             raise HTTPException(
                 status_code=500,
-                detail={"code": "root_password_reset_failed", "message": "Failed to reset root password"},
+                detail={"code": "reset_failed", "message": "Failed to reset root password"},
             )
     except docker.errors.NotFound:
         raise HTTPException(
@@ -1752,7 +1804,7 @@ async def reset_environment_root_password(
         logger.warning("Failed to reset root password for environment %s: %s", env.id, error)
         raise HTTPException(
             status_code=500,
-            detail={"code": "root_password_reset_failed", "message": "Failed to reset root password"},
+            detail={"code": "reset_failed", "message": "Failed to reset root password"},
         ) from error
 
     env.root_password = "__redacted__"
@@ -1760,6 +1812,10 @@ async def reset_environment_root_password(
     try:
         await db.commit()
     except Exception as error:
+        try:
+            await db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
         # Best-effort compensation: revert container password to previous value when DB sync fails.
         restored = False
         if previous_encrypted_password:

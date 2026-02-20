@@ -9,6 +9,7 @@ from ..models import Environment
 from ..routers import environments as env_router
 from ..routers import resources as resource_router
 from ..schemas import EnvironmentCreate
+from ..schemas import EnvironmentRootPasswordResetRequest
 
 
 router = APIRouter(
@@ -221,6 +222,22 @@ async def worker_delete_environment(environment_id: str, db: AsyncSession = Depe
         _action,
         fallback_code="delete_environment_failed",
         success_message="Environment deleted",
+    )
+
+
+@router.post("/environments/{environment_id}/accounts/root/reset-password")
+async def worker_reset_root_password(
+    environment_id: str,
+    payload: EnvironmentRootPasswordResetRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    async def _action() -> dict:
+        return await env_router.reset_environment_root_password(environment_id=environment_id, payload=payload, db=db)
+
+    return await _run_worker_action(
+        _action,
+        fallback_code="reset_failed",
+        success_message="Root password updated",
     )
 
 

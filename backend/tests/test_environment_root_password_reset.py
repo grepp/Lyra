@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
+from app.core.worker_registry import WorkerRequestError
 from app.routers import environments as env_router
 from app.schemas import EnvironmentRootPasswordResetRequest
 
@@ -30,6 +31,7 @@ class _FakeDb:
         self._env = env
         self.commit_called = False
         self._fail_commit = fail_commit
+        self.rollback_called = False
 
     async def execute(self, _stmt, *_args, **_kwargs):
         return _ExecuteResult(self._env)
@@ -38,6 +40,9 @@ class _FakeDb:
         self.commit_called = True
         if self._fail_commit:
             raise RuntimeError("commit failed")
+
+    async def rollback(self):
+        self.rollback_called = True
 
 
 def _env(*, status="running", worker_server_id=None):
@@ -117,9 +122,55 @@ def test_reset_root_password_host_success(monkeypatch):
     assert sock.payload == b"root:newpass123\n"
 
 
-def test_reset_root_password_rejects_worker_environment():
+def test_reset_root_password_routes_to_worker(monkeypatch):
     env = _env(status="running", worker_server_id=uuid.uuid4())
     db = _FakeDb(env)
+    worker = SimpleNamespace(id=env.worker_server_id, name="w1", base_url="http://w1:8000")
+
+    async def _fake_assert_worker_ready(_db, worker_server_id):
+        assert str(worker_server_id) == str(env.worker_server_id)
+        return worker
+
+    async def _fake_call_worker_api(_worker, *, method, path, payload=None, timeout=None):
+        assert method == "POST"
+        assert path.endswith(f"/api/worker/environments/{env.id}/accounts/root/reset-password")
+        assert payload == {"new_password": "newpass123"}
+        assert timeout is None
+        return {"message": "Root password updated"}
+
+    monkeypatch.setattr(env_router, "_assert_worker_is_ready", _fake_assert_worker_ready)
+    monkeypatch.setattr(env_router, "call_worker_api", _fake_call_worker_api)
+    monkeypatch.setattr(env_router, "encrypt_secret", lambda value: f"enc::{value}")
+
+    result = asyncio.run(
+        env_router.reset_environment_root_password(
+            str(env.id),
+            payload=EnvironmentRootPasswordResetRequest(new_password="newpass123"),
+            db=db,
+        )
+    )
+
+    assert result["message"] == "Root password updated"
+    assert db.commit_called is True
+    assert env.root_password == "__redacted__"
+    assert env.root_password_encrypted == "enc::newpass123"
+
+
+def test_reset_root_password_maps_worker_error(monkeypatch):
+    env = _env(status="running", worker_server_id=uuid.uuid4())
+    db = _FakeDb(env)
+    worker = SimpleNamespace(id=env.worker_server_id, name="w1", base_url="http://w1:8000")
+
+    async def _fake_assert_worker_ready(_db, _worker_server_id):
+        return worker
+
+    async def _fake_call_worker_api(_worker, *, method, path, payload=None, timeout=None):
+        del method, path, payload, timeout
+        raise WorkerRequestError("worker_unreachable", "Worker request timed out", status_code=503)
+
+    monkeypatch.setattr(env_router, "_assert_worker_is_ready", _fake_assert_worker_ready)
+    monkeypatch.setattr(env_router, "call_worker_api", _fake_call_worker_api)
+    monkeypatch.setattr(env_router, "encrypt_secret", lambda value: f"enc::{value}")
 
     with pytest.raises(HTTPException) as exc:
         asyncio.run(
@@ -130,8 +181,38 @@ def test_reset_root_password_rejects_worker_environment():
             )
         )
 
-    assert exc.value.status_code == 409
-    assert exc.value.detail["code"] == "worker_reset_not_supported"
+    assert exc.value.status_code == 503
+    assert exc.value.detail["code"] == "worker_unreachable"
+    assert db.commit_called is False
+
+
+def test_reset_root_password_maps_worker_auth_error(monkeypatch):
+    env = _env(status="running", worker_server_id=uuid.uuid4())
+    db = _FakeDb(env)
+    worker = SimpleNamespace(id=env.worker_server_id, name="w1", base_url="http://w1:8000")
+
+    async def _fake_assert_worker_ready(_db, _worker_server_id):
+        return worker
+
+    async def _fake_call_worker_api(_worker, *, method, path, payload=None, timeout=None):
+        del method, path, payload, timeout
+        raise WorkerRequestError("worker_auth_failed", "Worker authentication failed", status_code=401)
+
+    monkeypatch.setattr(env_router, "_assert_worker_is_ready", _fake_assert_worker_ready)
+    monkeypatch.setattr(env_router, "call_worker_api", _fake_call_worker_api)
+    monkeypatch.setattr(env_router, "encrypt_secret", lambda value: f"enc::{value}")
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            env_router.reset_environment_root_password(
+                str(env.id),
+                payload=EnvironmentRootPasswordResetRequest(new_password="newpass123"),
+                db=db,
+            )
+        )
+
+    assert exc.value.status_code == 401
+    assert exc.value.detail["code"] == "worker_auth_failed"
     assert db.commit_called is False
 
 
@@ -150,7 +231,7 @@ def test_reset_root_password_requires_running_environment(monkeypatch):
         )
 
     assert exc.value.status_code == 409
-    assert exc.value.detail["code"] == "environment_not_running"
+    assert exc.value.detail["code"] == "env_not_running"
     assert db.commit_called is False
 
 
@@ -244,7 +325,7 @@ def test_reset_root_password_exec_failure_hides_sensitive_output(monkeypatch):
         )
 
     assert exc.value.status_code == 500
-    assert exc.value.detail["code"] == "root_password_reset_failed"
+    assert exc.value.detail["code"] == "reset_failed"
     assert "newpass123" not in str(exc.value.detail)
 
 
@@ -300,3 +381,42 @@ def test_reset_root_password_commit_failure_reports_sync_error(monkeypatch):
 
     assert exc.value.status_code == 500
     assert exc.value.detail["code"] == "password_metadata_sync_failed"
+    assert db.rollback_called is True
+
+
+def test_reset_root_password_worker_commit_failure_attempts_remote_rollback(monkeypatch):
+    env = _env(status="running", worker_server_id=uuid.uuid4())
+    db = _FakeDb(env, fail_commit=True)
+    worker = SimpleNamespace(id=env.worker_server_id, name="w1", base_url="http://w1:8000")
+    calls: list[str] = []
+
+    async def _fake_assert_worker_ready(_db, _worker_server_id):
+        return worker
+
+    async def _fake_call_worker_api(_worker, *, method, path, payload=None, timeout=None):
+        del method, timeout
+        calls.append(payload["new_password"])
+        if payload["new_password"] == "newpass123":
+            return {"message": "Root password updated"}
+        if payload["new_password"] == "oldpass":
+            return {"message": "Root password updated"}
+        raise AssertionError(f"unexpected payload: {payload}")
+
+    monkeypatch.setattr(env_router, "_assert_worker_is_ready", _fake_assert_worker_ready)
+    monkeypatch.setattr(env_router, "call_worker_api", _fake_call_worker_api)
+    monkeypatch.setattr(env_router, "encrypt_secret", lambda value: f"enc::{value}")
+    monkeypatch.setattr(env_router, "decrypt_secret", lambda _v: "oldpass")
+
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(
+            env_router.reset_environment_root_password(
+                str(env.id),
+                payload=EnvironmentRootPasswordResetRequest(new_password="newpass123"),
+                db=db,
+            )
+        )
+
+    assert exc.value.status_code == 500
+    assert exc.value.detail["code"] == "password_metadata_sync_failed"
+    assert db.rollback_called is True
+    assert calls == ["newpass123", "oldpass"]

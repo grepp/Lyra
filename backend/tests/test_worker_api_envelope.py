@@ -6,6 +6,7 @@ from app.core.worker_auth import require_worker_api_auth, require_worker_role
 from app.routers import worker_api
 from app.routers import environments as env_router
 from app.routers import resources as resource_router
+from app.schemas import EnvironmentRootPasswordResetRequest
 
 
 def _build_client():
@@ -63,4 +64,47 @@ def test_worker_start_normalizes_http_exception(monkeypatch):
     assert response.status_code == 409
     body = response.json()
     assert body["detail"]["code"] == "environment_not_running"
+    assert body["detail"]["message"] == "Environment must be running"
+
+
+def test_worker_root_password_reset_envelope(monkeypatch):
+    async def _fake_reset(*, environment_id, payload: EnvironmentRootPasswordResetRequest, db):
+        assert environment_id == "11111111-1111-1111-1111-111111111111"
+        assert payload.new_password == "newpass123"
+        return {"message": "Root password updated"}
+
+    monkeypatch.setattr(env_router, "reset_environment_root_password", _fake_reset)
+
+    client = _build_client()
+    response = client.post(
+        "/api/worker/environments/11111111-1111-1111-1111-111111111111/accounts/root/reset-password",
+        json={"new_password": "newpass123"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["code"] == "ok"
+    assert body["data"]["message"] == "Root password updated"
+
+
+def test_worker_root_password_reset_normalizes_error(monkeypatch):
+    async def _fake_reset(*, environment_id, payload: EnvironmentRootPasswordResetRequest, db):
+        del environment_id, payload, db
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "env_not_running", "message": "Environment must be running"},
+        )
+
+    monkeypatch.setattr(env_router, "reset_environment_root_password", _fake_reset)
+
+    client = _build_client()
+    response = client.post(
+        "/api/worker/environments/11111111-1111-1111-1111-111111111111/accounts/root/reset-password",
+        json={"new_password": "newpass123"},
+    )
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["detail"]["code"] == "env_not_running"
     assert body["detail"]["message"] == "Environment must be running"
