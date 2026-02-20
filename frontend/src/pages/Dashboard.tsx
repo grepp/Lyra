@@ -731,6 +731,7 @@ export default function Dashboard() {
           {(() => {
             const sshClient = readStoredSshClientConfig();
             const guide = buildSshGuide(sshGuideEnv, {
+              host: sshClient.host,
               username: sshClient.username,
               port: sshClient.port,
             });
@@ -802,7 +803,6 @@ export default function Dashboard() {
                   </button>
                 </div>
               </div>
-              <p className="text-xs text-[var(--text-muted)]">{t('dashboard.sshGuideAliases', { jumpAlias: guide.jumpAlias, envAlias: guide.envAlias })}</p>
             </div>
             <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-soft)] flex justify-end shrink-0">
               <button

@@ -49,10 +49,12 @@ describe('buildSshGuide', () => {
 
   it('applies saved ssh client username/port for host jump config', () => {
     const guide = buildSshGuide(baseEnv, {
+      host: 'localhost',
       username: 'lyra-admin',
       port: '2222',
     });
-    expect(guide.oneShotCommand).toContain('-J lyra-admin@127.0.0.1:2222');
+    expect(guide.oneShotCommand).toContain('-J lyra-admin@localhost:2222');
+    expect(guide.sshConfig).toContain('HostName localhost');
     expect(guide.sshConfig).toContain('User lyra-admin');
     expect(guide.sshConfig).toContain('Port 2222');
   });
@@ -64,6 +66,7 @@ describe('buildSshGuide', () => {
       worker_server_name: 'Worker 01',
       worker_server_base_url: 'http://10.0.0.5:8000',
     }, {
+      host: 'localhost',
       username: 'ignored-user',
       port: '2022',
     });

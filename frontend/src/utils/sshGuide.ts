@@ -19,6 +19,7 @@ export interface SshGuideTemplate {
 }
 
 export interface SshGuideClientInfo {
+  host?: string | null;
   username?: string | null;
   port?: string | number | null;
 }
@@ -61,13 +62,16 @@ export const buildSshGuide = (
   env: SshGuideEnvironmentLike,
   clientInfo?: SshGuideClientInfo,
 ): SshGuideTemplate => {
-  const jumpHost = resolveSshHost(env);
   const targetUser = env.container_user || 'root';
   const jumpAlias = env.worker_server_name
     ? `lyra-worker-${sanitizeSshAliasPart(env.worker_server_name)}`
     : 'lyra-host';
   const envAlias = `lyra-env-${sanitizeSshAliasPart(env.name || env.id)}`;
   const applyHostClientInfo = !env.worker_server_name;
+  const jumpHostCandidate = String(clientInfo?.host || '').trim();
+  const jumpHost = applyHostClientInfo && jumpHostCandidate
+    ? jumpHostCandidate
+    : resolveSshHost(env);
   const jumpUserCandidate = String(clientInfo?.username || '').trim();
   const jumpUser = applyHostClientInfo && jumpUserCandidate ? jumpUserCandidate : '<host-ssh-user>';
   const jumpPort = applyHostClientInfo ? parseJumpPort(clientInfo?.port) : 22;
