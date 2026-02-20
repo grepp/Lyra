@@ -8,6 +8,7 @@ import Modal from '../components/Modal';
 import OverlayPortal from '../components/OverlayPortal';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
+import { buildSshGuide } from '../utils/sshGuide';
 
 interface MountConfig {
   host_path: string;
@@ -436,27 +437,6 @@ export default function Dashboard() {
     });
   };
 
-  const resolveSshHost = (env: Environment) => {
-    if (!env.worker_server_name) {
-      return '127.0.0.1';
-    }
-    const baseUrl = env.worker_server_base_url || '';
-    if (baseUrl) {
-      try {
-        return new URL(baseUrl).hostname;
-      } catch {
-        // Fall through to worker name.
-      }
-    }
-    return env.worker_server_name;
-  };
-
-  const buildSshCommand = (env: Environment) => {
-    const host = resolveSshHost(env);
-    const sshUser = env.container_user || 'root';
-    return `ssh -p ${env.ssh_port} ${sshUser}@${host}`;
-  };
-
   const openSshAccessGuide = (env: Environment) => {
     setSshGuideEnv(env);
   };
@@ -675,6 +655,9 @@ export default function Dashboard() {
       />
       {sshGuideEnv && (
         <OverlayPortal className="p-4">
+          {(() => {
+            const guide = buildSshGuide(sshGuideEnv);
+            return (
           <div className="w-full max-w-2xl rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] shadow-2xl animate-in fade-in zoom-in duration-200 overflow-hidden">
             <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
               <h3 className="text-lg font-bold text-[var(--text)]">{t('dashboard.sshAccessGuideTitle')}</h3>
@@ -684,11 +667,18 @@ export default function Dashboard() {
             </div>
             <div className="p-6 space-y-3">
               <p className="text-sm text-[var(--text-muted)]">{t('dashboard.sshAccessGuideFor', { name: sshGuideEnv.name })}</p>
-              <p className="text-xs text-[var(--text-muted)]">{t('dashboard.sshAccessGuideHostInfo', { host: resolveSshHost(sshGuideEnv), port: sshGuideEnv.ssh_port })}</p>
+              <p className="text-xs text-[var(--text-muted)]">
+                {t('dashboard.sshAccessGuideHostInfo', { host: guide.jumpHost, port: sshGuideEnv.ssh_port })}
+              </p>
               <div className="rounded-md border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2">
-                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">{t('dashboard.sshCommand')}</div>
-                <div className="mt-1 font-mono text-sm text-[var(--text)] break-all">{buildSshCommand(sshGuideEnv)}</div>
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">{t('dashboard.sshGuideOneShot')}</div>
+                <div className="mt-1 font-mono text-sm text-[var(--text)] break-all">{guide.oneShotCommand}</div>
               </div>
+              <div className="rounded-md border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">{t('dashboard.sshGuideConfigExample')}</div>
+                <pre className="mt-1 whitespace-pre-wrap break-all font-mono text-xs text-[var(--text)]">{guide.sshConfig}</pre>
+              </div>
+              <p className="text-xs text-[var(--text-muted)]">{t('dashboard.sshGuideAliases', { jumpAlias: guide.jumpAlias, envAlias: guide.envAlias })}</p>
             </div>
             <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-soft)] flex justify-end">
               <button
@@ -699,6 +689,8 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
+            );
+          })()}
         </OverlayPortal>
       )}
 
