@@ -32,6 +32,10 @@ def _normalize_host_path(path: str | None) -> str:
         return "/"
     if not normalized.startswith("/"):
         normalized = f"/{normalized}"
+    # POSIX allows implementation-defined semantics for paths beginning with
+    # exactly two slashes. Keep behavior deterministic by collapsing any
+    # duplicated leading slash to a single '/'.
+    normalized = "/" + normalized.lstrip("/")
     return normalized
 
 

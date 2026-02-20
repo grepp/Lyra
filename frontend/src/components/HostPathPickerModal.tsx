@@ -38,7 +38,8 @@ interface HostPathPickerModalProps {
 const normalizePath = (value?: string): string => {
   const raw = (value || '').trim();
   if (!raw) return '/';
-  return raw.startsWith('/') ? raw : `/${raw}`;
+  const withLeadingSlash = raw.startsWith('/') ? raw : `/${raw}`;
+  return withLeadingSlash.replace(/^\/+/, '/');
 };
 
 export default function HostPathPickerModal({

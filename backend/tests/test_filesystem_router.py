@@ -59,6 +59,7 @@ def test_normalize_host_path_validation_cases():
     assert fs_router._normalize_host_path(".") == "/"
     assert fs_router._normalize_host_path("tmp/data") == "/tmp/data"
     assert fs_router._normalize_host_path("/tmp/../var//log") == "/var/log"
+    assert fs_router._normalize_host_path("//tmp/work") == "/tmp/work"
 
 
 def test_build_list_command_includes_zsh_nonomatch_guard():
@@ -117,6 +118,34 @@ def test_list_host_directory_normalizes_relative_request_path(monkeypatch):
     result = asyncio.run(
         fs_router.list_host_directory(
             req=fs_router.HostFsListRequest(path="tmp/work"),
+            db=object(),
+        )
+    )
+
+    assert result["status"] == "success"
+    assert result["path"] == "/tmp/work"
+    assert result["parent"] == "/tmp"
+    assert result["entries"][0]["path"] == "/tmp/work/a-dir"
+    assert ssh_client.closed is True
+
+
+def test_list_host_directory_collapses_double_leading_slash(monkeypatch):
+    output = "\n".join(
+        [
+            "__PATH__://tmp/work",
+            "a-dir\t//tmp/work/a-dir\td\t1\t1",
+        ]
+    )
+    ssh_client = _FakeSshClient(out=output)
+
+    async def _fake_connect_host_ssh(_db, **_kwargs):
+        return ssh_client
+
+    monkeypatch.setattr(fs_router, "connect_host_ssh", _fake_connect_host_ssh)
+
+    result = asyncio.run(
+        fs_router.list_host_directory(
+            req=fs_router.HostFsListRequest(path="//tmp/work"),
             db=object(),
         )
     )
