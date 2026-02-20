@@ -20,6 +20,10 @@
     --primary-contrast: #ffffff;
     --danger: #dc2626;
     --success: #16a34a;
+    --warning-bg: #fef3c7;
+    --warning-border: #f59e0b;
+    --warning-text: #78350f;
+    --warning-title: #92400e;
     --terminal-bg: #000000;
     --terminal-border: #3f3f46;
   }
@@ -37,6 +41,10 @@
     --primary-contrast: #ffffff;
     --danger: #ef4444;
     --success: #22c55e;
+    --warning-bg: rgb(245 158 11 / 0.12);
+    --warning-border: rgb(245 158 11 / 0.38);
+    --warning-text: #fcd34d;
+    --warning-title: #fbbf24;
     --terminal-bg: #000000;
     --terminal-border: #3f3f46;
   }

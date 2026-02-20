@@ -51,6 +51,10 @@ class EnvironmentResponse(EnvironmentBase):
         from_attributes = True
 
 
+class EnvironmentRootPasswordResetRequest(BaseModel):
+    new_password: str
+
+
 class CustomPortAllocateRequest(BaseModel):
     count: int = 1
     current_ports: List[CustomPortMapping] = []

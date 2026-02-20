@@ -10,6 +10,7 @@ import OverlayPortal from '../components/OverlayPortal';
 import Modal from '../components/Modal';
 import { getStoredUserName, setStoredUserName } from '../utils/userIdentity';
 import {
+  clearStoredSshClientConfig,
   isSshClientConfigReady,
   readStoredSshClientConfig,
   toSshConnectPayload,
@@ -110,6 +111,7 @@ export default function Settings() {
   const [tmuxLoading, setTmuxLoading] = useState(false);
   const [resourceCleanupTarget, setResourceCleanupTarget] = useState<ResourceCleanupTarget>(null);
   const [workerCleanupTarget, setWorkerCleanupTarget] = useState<WorkerCleanupTarget>(null);
+  const [sshResetConfirmOpen, setSshResetConfirmOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const faviconInputRef = useRef<HTMLInputElement>(null);
 
@@ -491,6 +493,34 @@ export default function Settings() {
     } catch (error) {
       console.error(error);
       setSshStatus({ type: 'error', message: t('feedback.settings.sshSettingsUpdateFailed') });
+    }
+  };
+
+  const handleResetSsh = () => {
+    try {
+      setSshResetConfirmOpen(false);
+      clearStoredSshClientConfig();
+      localStorage.removeItem('ssh_private_key_encrypted');
+      localStorage.removeItem('ssh_key_name');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+
+      setSshSettings({
+        port: '22',
+        username: '',
+        authMethod: 'password',
+        password: '',
+        privateKey: '',
+        keyName: '',
+        masterPassword: '',
+      });
+      setTmuxSessions([]);
+      setSelectedTmuxSessions([]);
+      setSessionStatus({ type: 'idle' });
+      setSshStatus({ type: 'success', message: t('feedback.settings.sshSettingsReset') });
+      setTimeout(() => setSshStatus({ type: 'idle' }), 3000);
+    } catch (error) {
+      console.error(error);
+      setSshStatus({ type: 'error', message: t('feedback.settings.sshSettingsResetFailed') });
     }
   };
 
@@ -963,6 +993,16 @@ export default function Settings() {
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <Modal
+        isOpen={sshResetConfirmOpen}
+        onClose={() => setSshResetConfirmOpen(false)}
+        onConfirm={handleResetSsh}
+        title={t('settings.sshResetConfirmTitle')}
+        message={t('settings.sshResetConfirmMessage')}
+        type="confirm"
+        confirmText={t('actions.confirm')}
+        cancelText={t('actions.cancel')}
+      />
+      <Modal
         isOpen={resourceCleanupTarget !== null}
         onClose={() => setResourceCleanupTarget(null)}
         onConfirm={handleConfirmResourceCleanup}
@@ -1308,6 +1348,13 @@ export default function Settings() {
               )}
 
               <div className="flex flex-col sm:flex-row items-center justify-end gap-4">
+                <button
+                  type="button"
+                  onClick={() => setSshResetConfirmOpen(true)}
+                  className={`${dangerButtonClass} w-full sm:w-auto px-6 font-medium`}
+                >
+                  {t('actions.reset')}
+                </button>
                 <button
                   type="button"
                   onClick={handleTestSsh}

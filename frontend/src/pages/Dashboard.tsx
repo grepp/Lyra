@@ -1,14 +1,15 @@
 import axios from 'axios';
-import { ChevronDown, ChevronUp, Code2, HardDrive, HelpCircle, LayoutTemplate, Network, Play, RefreshCw, Square, SquareTerminal, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Code2, Eye, EyeOff, HardDrive, HelpCircle, LayoutTemplate, Network, Play, RefreshCw, Square, SquareTerminal, Trash2, X } from 'lucide-react';
 import { isValidElement, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import OverlayPortal from '../components/OverlayPortal';
 import { useApp } from '../context/AppContext';
 import { useToast } from '../context/ToastContext';
+import { buildSshGuide } from '../utils/sshGuide';
+import { readStoredSshClientConfig } from '../utils/sshClientConfig';
 
 interface MountConfig {
   host_path: string;
@@ -43,14 +44,12 @@ interface Environment {
 }
 
 const ENVS_CACHE_KEY = 'lyra.dashboard.environments';
-const TERMINAL_ACTION_QUEUE_KEY = 'lyra.terminal.pending_action';
 const NOTICE_OPEN_KEY = 'lyra.dashboard.notice_open';
 const MIN_REFRESH_SPIN_MS = 900;
 
 export default function Dashboard() {
   const { showToast } = useToast();
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const { announcementMarkdown } = useApp();
   const hasAnnouncement = announcementMarkdown.trim().length > 0;
   const [isNoticeOpen, setIsNoticeOpen] = useState(() => {
@@ -88,6 +87,12 @@ export default function Dashboard() {
   const [errorLogEnv, setErrorLogEnv] = useState<Environment | null>(null);
   const [errorLog, setErrorLog] = useState<string>("");
   const [logLoading, setLogLoading] = useState(false);
+  const [sshGuideEnv, setSshGuideEnv] = useState<Environment | null>(null);
+  const [rootResetPassword, setRootResetPassword] = useState('');
+  const [rootResetInputError, setRootResetInputError] = useState('');
+  const [showRootResetPassword, setShowRootResetPassword] = useState(false);
+  const [rootResetConfirm, setRootResetConfirm] = useState<{ envId: string; name: string; password: string } | null>(null);
+  const [rootResetSubmitting, setRootResetSubmitting] = useState(false);
   const [workerErrorInfo, setWorkerErrorInfo] = useState<{ name: string; message: string } | null>(null);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [isRefreshSpinning, setIsRefreshSpinning] = useState(false);
@@ -438,71 +443,8 @@ export default function Dashboard() {
     });
   };
 
-  const openEnvInTerminal = (env: Environment) => {
-    const resolveSshHost = () => {
-      if (!env.worker_server_name) {
-        return '127.0.0.1';
-      }
-      const baseUrl = env.worker_server_base_url || '';
-      if (baseUrl) {
-        try {
-          return new URL(baseUrl).hostname;
-        } catch {
-          // Fall through to worker name.
-        }
-      }
-      return env.worker_server_name;
-    };
-
-    const host = resolveSshHost();
-    const sshUser = env.container_user || 'root';
-    const sshCommand = `ssh -p ${env.ssh_port} ${sshUser}@${host}`;
-
-    if (env.worker_server_name) {
-      const copyWithFallback = async (text: string) => {
-        if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(text);
-          return;
-        }
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.setAttribute('readonly', 'true');
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        textarea.style.left = '-9999px';
-        document.body.appendChild(textarea);
-        textarea.select();
-        const copied = document.execCommand('copy');
-        document.body.removeChild(textarea);
-        if (!copied) {
-          throw new Error('copy_failed');
-        }
-      };
-
-      copyWithFallback(sshCommand)
-        .then(() => {
-          showToast(t('feedback.dashboard.sshCopied'), 'success');
-        })
-        .catch(() => {
-          showToast(t('feedback.dashboard.copyFailedRunManually', { command: sshCommand }), 'error');
-        });
-      return;
-    }
-
-    try {
-      window.localStorage.setItem(
-        TERMINAL_ACTION_QUEUE_KEY,
-        JSON.stringify({
-          type: 'open_tab_and_run',
-          command: sshCommand,
-          environmentName: env.name,
-          requestedAt: Date.now(),
-        }),
-      );
-    } catch {
-      // Ignore storage failures and still move to terminal page.
-    }
-    navigate('/terminal');
+  const openSshAccessGuide = (env: Environment) => {
+    setSshGuideEnv(env);
   };
 
   const openJupyter = async (env: Environment) => {
@@ -561,6 +503,62 @@ export default function Dashboard() {
     }
   };
 
+  const copySshGuideValue = async (value: string, successMessage: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      showToast(successMessage, 'success');
+    } catch {
+      showToast(t('feedback.dashboard.sshGuideCopyFailed'), 'error');
+    }
+  };
+
+  const requestRootPasswordReset = () => {
+    if (!sshGuideEnv) return;
+    const password = rootResetPassword;
+    if (!password.trim()) {
+      setRootResetInputError(t('feedback.dashboard.rootPasswordRequired'));
+      return;
+    }
+    if (password.length < 4) {
+      setRootResetInputError(t('feedback.dashboard.rootPasswordTooShort'));
+      return;
+    }
+    setRootResetInputError('');
+    setRootResetConfirm({ envId: sshGuideEnv.id, name: sshGuideEnv.name, password });
+  };
+
+  const submitRootPasswordReset = async () => {
+    if (!rootResetConfirm) return;
+    setRootResetSubmitting(true);
+    try {
+      await axios.post(`environments/${rootResetConfirm.envId}/accounts/root/reset-password`, {
+        new_password: rootResetConfirm.password,
+      });
+      showToast(t('feedback.dashboard.rootPasswordResetSuccess'), 'success');
+      setRootResetPassword('');
+      setRootResetInputError('');
+      await fetchEnvironments();
+    } catch (error: unknown) {
+      const { code, message } = getApiErrorCodeAndMessage(error);
+      if (code) {
+        const workerKey = `dashboard.workerError.${code}`;
+        const workerTranslated = t(workerKey);
+        if (workerTranslated !== workerKey) {
+          showToast(workerTranslated, 'error');
+        } else {
+          showToast(message || t('feedback.dashboard.rootPasswordResetFailed'), 'error');
+        }
+      } else if (message) {
+        showToast(message, 'error');
+      } else {
+        showToast(t('feedback.dashboard.rootPasswordResetFailed'), 'error');
+      }
+    } finally {
+      setRootResetSubmitting(false);
+      setRootResetConfirm(null);
+    }
+  };
+
   useEffect(() => {
     fetchEnvironments({ showLoading: true });
     const interval = setInterval(() => {
@@ -596,6 +594,12 @@ export default function Dashboard() {
     }
   }, [hasAnnouncement, isNoticeOpen]);
 
+  useEffect(() => {
+    setRootResetPassword('');
+    setRootResetInputError('');
+    setShowRootResetPassword(false);
+  }, [sshGuideEnv?.id]);
+
   const renderAccessCell = (env: Environment): ReactNode => {
     const hasWorkerError = Boolean(env.worker_server_name && (env.worker_error_code || env.worker_error_message));
     if (env.status === 'stopped' || env.status === 'error' || hasWorkerError) {
@@ -606,26 +610,20 @@ export default function Dashboard() {
     const jupyterEnabled = env.enable_jupyter !== false;
     const codeEnabled = env.enable_code_server !== false;
 
-    const isWorkerEnv = Boolean(env.worker_server_name);
-
     const accessItems: Array<{ key: string; node: ReactNode }> = [
       {
         key: 'ssh',
         node: (
           <div className="relative group">
             <button
-              onClick={() => openEnvInTerminal(env)}
+              onClick={() => openSshAccessGuide(env)}
               disabled={!isRunning}
               className="p-1 hover:bg-[var(--bg-soft)] rounded text-[var(--text-muted)] hover:text-blue-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <SquareTerminal size={14} />
             </button>
             <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-[var(--text)] opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
-              {isWorkerEnv && isRunning
-                ? t('dashboard.copySshCommand', { port: env.ssh_port })
-                : !isWorkerEnv && isRunning
-                ? t('dashboard.openInTerminal', { port: env.ssh_port })
-                : t('dashboard.environmentMustBeRunning', { port: env.ssh_port })}
+              {isRunning ? t('dashboard.openSshGuide', { port: env.ssh_port }) : t('dashboard.environmentMustBeRunning', { port: env.ssh_port })}
             </div>
           </div>
         ),
@@ -723,6 +721,127 @@ export default function Dashboard() {
         message={t('dashboard.forceDeleteEnvironmentMessage')}
         isDestructive={true}
       />
+      <Modal
+        isOpen={!!rootResetConfirm}
+        onClose={() => setRootResetConfirm(null)}
+        onConfirm={() => {
+          void submitRootPasswordReset();
+        }}
+        title={t('dashboard.rootPasswordResetConfirmTitle')}
+        message={t('dashboard.rootPasswordResetConfirmMessage', { name: rootResetConfirm?.name || '' })}
+        isDestructive={true}
+        confirmText={t('dashboard.rootPasswordResetConfirmAction')}
+      />
+      {sshGuideEnv && (
+        <OverlayPortal className="p-4">
+          {(() => {
+            const sshClient = readStoredSshClientConfig();
+            const guide = buildSshGuide(sshGuideEnv, {
+              host: sshClient.host,
+              username: sshClient.username,
+              port: sshClient.port,
+            });
+            const showSshGuideNotes = !sshGuideEnv.worker_server_name && !String(sshClient.username || '').trim();
+            return (
+          <div className="w-full max-w-2xl max-h-[85vh] rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] shadow-2xl animate-in fade-in zoom-in duration-200 overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-[var(--border)] flex justify-between items-center shrink-0">
+              <h3 className="text-lg font-bold text-[var(--text)]">{t('dashboard.sshAccessGuideTitle')}</h3>
+              <button onClick={() => setSshGuideEnv(null)} className="text-[var(--text-muted)] hover:text-[var(--text)] transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-3 overflow-y-auto">
+              <p className="text-sm text-[var(--text-muted)]">{t('dashboard.sshAccessGuideFor', { name: sshGuideEnv.name })}</p>
+              <p className="text-xs text-[var(--text-muted)]">
+                {t('dashboard.sshAccessGuideHostInfo', { host: guide.jumpHost, port: sshGuideEnv.ssh_port })}
+              </p>
+              <div className="rounded-md border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">{t('dashboard.sshGuideOneShot')}</div>
+                  <button
+                    type="button"
+                    onClick={() => void copySshGuideValue(guide.oneShotCommand, t('feedback.dashboard.sshGuideCommandCopied'))}
+                    className="rounded border border-[var(--border)] px-2 py-0.5 text-[10px] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg-elevated)] transition-colors"
+                  >
+                    {t('dashboard.sshGuideCopyCommand')}
+                  </button>
+                </div>
+                <div className="mt-1 font-mono text-sm text-[var(--text)] break-all">{guide.oneShotCommand}</div>
+              </div>
+              <div className="rounded-md border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">{t('dashboard.sshGuideConfigExample')}</div>
+                  <button
+                    type="button"
+                    onClick={() => void copySshGuideValue(guide.sshConfig, t('feedback.dashboard.sshGuideConfigCopied'))}
+                    className="rounded border border-[var(--border)] px-2 py-0.5 text-[10px] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg-elevated)] transition-colors"
+                  >
+                    {t('dashboard.sshGuideCopyConfig')}
+                  </button>
+                </div>
+                <pre className="mt-1 whitespace-pre-wrap break-all font-mono text-xs text-[var(--text)]">{guide.sshConfig}</pre>
+              </div>
+              {showSshGuideNotes && (
+                <div className="rounded-md border px-3 py-2 text-xs" style={{ borderColor: 'var(--warning-border)', backgroundColor: 'var(--warning-bg)', color: 'var(--warning-text)' }}>
+                  <div className="font-medium" style={{ color: 'var(--warning-title)' }}>{t('dashboard.sshGuideNotes')}</div>
+                  <ul className="mt-1 list-disc pl-4 space-y-1">
+                    <li>{t('dashboard.sshGuideRootWarning')}</li>
+                    <li>{t('dashboard.sshGuidePlaceholderWarning')}</li>
+                  </ul>
+                </div>
+              )}
+              <div className="rounded-md border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-3 space-y-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">{t('dashboard.rootAccountSectionTitle')}</div>
+                <div className="text-xs text-[var(--text-muted)]">{t('dashboard.rootAccountSectionDescription')}</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-[var(--text)]">{t('dashboard.accountRootLabel')}</span>
+                  <div className="flex min-w-0 flex-1 items-center rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1.5 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500/20">
+                    <input
+                      type={showRootResetPassword ? 'text' : 'password'}
+                      value={rootResetPassword}
+                      onChange={(event) => {
+                        setRootResetPassword(event.target.value);
+                        if (rootResetInputError) setRootResetInputError('');
+                      }}
+                      placeholder={t('dashboard.rootPasswordResetInputPlaceholder')}
+                      className="min-w-0 flex-1 bg-transparent px-1 text-sm text-[var(--text)] focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRootResetPassword((prev) => !prev)}
+                      className="shrink-0 rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-soft)] hover:text-[var(--text)] transition-colors"
+                      aria-label={showRootResetPassword ? t('actions.hide') : t('actions.show')}
+                    >
+                      {showRootResetPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={requestRootPasswordReset}
+                    disabled={rootResetSubmitting}
+                    className="shrink-0 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-1.5 text-xs text-[var(--text)] hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {t('dashboard.rootPasswordResetAction')}
+                  </button>
+                </div>
+                {rootResetInputError && (
+                  <p className="text-xs text-red-500">{rootResetInputError}</p>
+                )}
+              </div>
+            </div>
+            <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-soft)] flex justify-end shrink-0">
+              <button
+                onClick={() => setSshGuideEnv(null)}
+                className="rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-2 text-sm text-[var(--text)] hover:brightness-95 transition-colors"
+              >
+                {t('actions.close')}
+              </button>
+            </div>
+          </div>
+            );
+          })()}
+        </OverlayPortal>
+      )}
 
       {/* Volume Details Modal */}
       {selectedVolEnv && (

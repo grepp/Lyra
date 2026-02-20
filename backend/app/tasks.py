@@ -172,11 +172,11 @@ def _build_runtime_command(jupyter_mode: Optional[str], enable_jupyter: bool, en
     if enable_jupyter:
         if jupyter_mode == "python_module":
             script_parts.append(
-                'exec python3 -m jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --ServerApp.token="$JUPYTER_TOKEN" --NotebookApp.token="$JUPYTER_TOKEN"'  # noqa: E501
+                'exec python3 -m jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --ServerApp.token="$JUPYTER_TOKEN" --NotebookApp.token="$JUPYTER_TOKEN" --ServerApp.terminado_settings="{\'shell_command\': [\'$(command -v zsh || command -v bash || command -v sh || echo /bin/sh)\']}"'  # noqa: E501
             )
         else:
             script_parts.append(
-                'exec jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --ServerApp.token="$JUPYTER_TOKEN" --NotebookApp.token="$JUPYTER_TOKEN"'  # noqa: E501
+                'exec jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --ServerApp.token="$JUPYTER_TOKEN" --NotebookApp.token="$JUPYTER_TOKEN" --ServerApp.terminado_settings="{\'shell_command\': [\'$(command -v zsh || command -v bash || command -v sh || echo /bin/sh)\']}"'  # noqa: E501
             )
     else:
         script_parts.append("exec tail -f /dev/null")

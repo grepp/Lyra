@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
+import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import text
@@ -8,7 +9,7 @@ from typing import List
 from uuid import UUID
 from ..database import get_db
 from ..models import Environment, Setting, WorkerServer
-from ..core.security import SecretCipherError, SecretKeyError, encrypt_secret
+from ..core.security import SecretCipherError, SecretKeyError, decrypt_secret, encrypt_secret
 from ..core.worker_registry import (
     WORKER_HEALTH_HEALTHY,
     WorkerRequestError,
@@ -20,6 +21,7 @@ from ..schemas import (
     CustomPortAllocateResponse,
     CustomPortMapping,
     EnvironmentCreate,
+    EnvironmentRootPasswordResetRequest,
     EnvironmentResponse,
 )
 from ..tasks import create_environment_task
@@ -29,6 +31,7 @@ import secrets
 import time
 import random
 import logging
+import socket
 from sqlalchemy.exc import IntegrityError
 import json
 from urllib.parse import urlsplit, urlunsplit
@@ -52,6 +55,58 @@ GPU_OCCUPIED_STATUSES = {"creating", "building", "running", "starting"}
 REMOTE_SURROGATE_PORT_RANGE = (61001, 65535)
 logger = logging.getLogger(__name__)
 BUILD_ERROR_SETTING_PREFIX = "build_error:"
+
+
+def _write_exec_stdin(sock: object, payload: bytes) -> None:
+    # docker SDK may return different socket wrappers by version.
+    if hasattr(sock, "sendall"):
+        sock.sendall(payload)  # type: ignore[attr-defined]
+        return
+
+    raw_sock = getattr(sock, "_sock", None) or getattr(sock, "sock", None)
+    if raw_sock is not None and hasattr(raw_sock, "sendall"):
+        raw_sock.sendall(payload)  # type: ignore[attr-defined]
+        return
+
+    if hasattr(sock, "send"):
+        total = 0
+        while total < len(payload):
+            sent = sock.send(payload[total:])  # type: ignore[attr-defined]
+            if not sent:
+                raise RuntimeError("Failed to write docker exec stdin payload")
+            total += int(sent)
+        return
+
+    raise RuntimeError("Docker exec stdin socket does not support send operations")
+
+
+def _close_exec_stdin(sock: object) -> None:
+    raw_sock = getattr(sock, "_sock", None) or getattr(sock, "sock", None)
+    if raw_sock is not None and hasattr(raw_sock, "shutdown"):
+        try:
+            raw_sock.shutdown(socket.SHUT_WR)  # type: ignore[attr-defined]
+        except OSError:
+            pass
+    if hasattr(sock, "close"):
+        try:
+            sock.close()  # type: ignore[attr-defined]
+        except OSError:
+            pass
+
+
+async def _wait_exec_exit_code(docker_api: object, exec_id: str, timeout_seconds: float = 2.0) -> int | None:
+    deadline = time.time() + timeout_seconds
+    while True:
+        info = docker_api.exec_inspect(exec_id)  # type: ignore[attr-defined]
+        exit_code = info.get("ExitCode")
+        if exit_code is not None:
+            try:
+                return int(exit_code)
+            except (TypeError, ValueError):
+                return None
+        if time.time() >= deadline:
+            return None
+        await asyncio.sleep(0.05)
 
 
 def _extract_dockerfile_base_image(dockerfile_content: str) -> str | None:
@@ -1652,3 +1707,202 @@ async def stop_environment(environment_id: str, db: AsyncSession = Depends(get_d
         env.status = "error"
         await db.commit()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _validate_new_root_password(value: str) -> str:
+    password = str(value or "")
+    if not password.strip():
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "invalid_password", "message": "new_password is required"},
+        )
+    if len(password) < 4:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "weak_password", "message": "new_password must be at least 4 characters"},
+        )
+    if "\n" in password or "\r" in password:
+        raise HTTPException(
+            status_code=400,
+            detail={"code": "invalid_password", "message": "new_password cannot contain line breaks"},
+        )
+    return password
+
+
+@router.post("/{environment_id}/accounts/root/reset-password", status_code=status.HTTP_200_OK)
+async def reset_environment_root_password(
+    environment_id: str,
+    payload: EnvironmentRootPasswordResetRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Environment).where(Environment.id == environment_id))
+    env = result.scalars().first()
+    if env is None:
+        raise HTTPException(status_code=404, detail="Environment not found")
+
+    if env.worker_server_id:
+        worker = await _assert_worker_is_ready(db, env.worker_server_id)
+        new_password = _validate_new_root_password(payload.new_password)
+        previous_encrypted_password = env.root_password_encrypted
+        try:
+            encrypted_password = encrypt_secret(new_password)
+        except (SecretKeyError, SecretCipherError) as error:
+            raise HTTPException(
+                status_code=500,
+                detail={"code": "password_encryption_failed", "message": str(error)},
+            ) from error
+        try:
+            response = await call_worker_api(
+                worker,
+                method="POST",
+                path=f"/api/worker/environments/{env.id}/accounts/root/reset-password",
+                payload={"new_password": new_password},
+            )
+        except WorkerRequestError as error:
+            raise _map_worker_request_error(error) from error
+
+        env.root_password = "__redacted__"
+        env.root_password_encrypted = encrypted_password
+        try:
+            await db.commit()
+        except Exception as error:
+            try:
+                await db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+            restored = False
+            if previous_encrypted_password:
+                try:
+                    previous_password = decrypt_secret(previous_encrypted_password)
+                    await call_worker_api(
+                        worker,
+                        method="POST",
+                        path=f"/api/worker/environments/{env.id}/accounts/root/reset-password",
+                        payload={"new_password": previous_password},
+                    )
+                    restored = True
+                except Exception as rollback_error:  # noqa: BLE001
+                    logger.warning(
+                        "Failed to rollback worker root password change for environment %s after DB commit error: %s",
+                        env.id,
+                        rollback_error,
+                    )
+            logger.warning("Failed to persist worker root password metadata for environment %s: %s", env.id, error)
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "code": "password_metadata_sync_failed",
+                    "message": (
+                        "Failed to persist root password metadata"
+                        if restored
+                        else "Failed to persist root password metadata (manual verification required)"
+                    ),
+                },
+            ) from error
+        return response if isinstance(response, dict) else {"message": "Root password updated"}
+
+    if env.status != "running" and not _is_host_environment_running_now(env):
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "env_not_running", "message": "Environment must be running"},
+        )
+
+    new_password = _validate_new_root_password(payload.new_password)
+
+    previous_encrypted_password = env.root_password_encrypted
+    try:
+        encrypted_password = encrypt_secret(new_password)
+    except (SecretKeyError, SecretCipherError) as error:
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "password_encryption_failed", "message": str(error)},
+        ) from error
+
+    container_name = f"lyra-{env.name}-{env.id}"
+    client = docker.from_env()
+    try:
+        container = client.containers.get(container_name)
+        if container.status != "running":
+            raise HTTPException(
+                status_code=409,
+                detail={"code": "env_not_running", "message": "Environment must be running"},
+            )
+
+        exec_id = client.api.exec_create(
+            container.id,
+            cmd=["chpasswd"],
+            stdin=True,
+            tty=False,
+        )["Id"]
+        sock = client.api.exec_start(exec_id, detach=False, tty=False, socket=True)
+        try:
+            _write_exec_stdin(sock, f"root:{new_password}\n".encode("utf-8"))
+        finally:
+            _close_exec_stdin(sock)
+
+        exit_code = await _wait_exec_exit_code(client.api, exec_id)
+        if exit_code is None or exit_code != 0:
+            raise HTTPException(
+                status_code=500,
+                detail={"code": "reset_failed", "message": "Failed to reset root password"},
+            )
+    except docker.errors.NotFound:
+        raise HTTPException(
+            status_code=409,
+            detail={"code": "container_not_found", "message": "Container not found. Please recreate the environment."},
+        )
+    except HTTPException:
+        raise
+    except Exception as error:
+        logger.warning("Failed to reset root password for environment %s: %s", env.id, error)
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "reset_failed", "message": "Failed to reset root password"},
+        ) from error
+
+    env.root_password = "__redacted__"
+    env.root_password_encrypted = encrypted_password
+    try:
+        await db.commit()
+    except Exception as error:
+        try:
+            await db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        # Best-effort compensation: revert container password to previous value when DB sync fails.
+        restored = False
+        if previous_encrypted_password:
+            try:
+                previous_password = decrypt_secret(previous_encrypted_password)
+                rollback_exec_id = client.api.exec_create(
+                    container.id,
+                    cmd=["chpasswd"],
+                    stdin=True,
+                    tty=False,
+                )["Id"]
+                rollback_sock = client.api.exec_start(rollback_exec_id, detach=False, tty=False, socket=True)
+                try:
+                    _write_exec_stdin(rollback_sock, f"root:{previous_password}\n".encode("utf-8"))
+                finally:
+                    _close_exec_stdin(rollback_sock)
+                rollback_exit = await _wait_exec_exit_code(client.api, rollback_exec_id)
+                restored = rollback_exit is not None and rollback_exit == 0
+            except Exception as rollback_error:  # noqa: BLE001
+                logger.warning(
+                    "Failed to rollback root password change for environment %s after DB commit error: %s",
+                    env.id,
+                    rollback_error,
+                )
+        logger.warning("Failed to persist root password reset metadata for environment %s: %s", env.id, error)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "code": "password_metadata_sync_failed",
+                "message": (
+                    "Failed to persist root password metadata"
+                    if restored
+                    else "Failed to persist root password metadata (manual verification required)"
+                ),
+            },
+        ) from error
+    return {"message": "Root password updated"}
