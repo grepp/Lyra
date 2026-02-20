@@ -4,7 +4,6 @@ import { isValidElement, useCallback, useEffect, useMemo, useRef, useState, type
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import Modal from '../components/Modal';
 import OverlayPortal from '../components/OverlayPortal';
 import { useApp } from '../context/AppContext';
@@ -43,14 +42,12 @@ interface Environment {
 }
 
 const ENVS_CACHE_KEY = 'lyra.dashboard.environments';
-const TERMINAL_ACTION_QUEUE_KEY = 'lyra.terminal.pending_action';
 const NOTICE_OPEN_KEY = 'lyra.dashboard.notice_open';
 const MIN_REFRESH_SPIN_MS = 900;
 
 export default function Dashboard() {
   const { showToast } = useToast();
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const { announcementMarkdown } = useApp();
   const hasAnnouncement = announcementMarkdown.trim().length > 0;
   const [isNoticeOpen, setIsNoticeOpen] = useState(() => {
@@ -88,6 +85,7 @@ export default function Dashboard() {
   const [errorLogEnv, setErrorLogEnv] = useState<Environment | null>(null);
   const [errorLog, setErrorLog] = useState<string>("");
   const [logLoading, setLogLoading] = useState(false);
+  const [sshGuideEnv, setSshGuideEnv] = useState<Environment | null>(null);
   const [workerErrorInfo, setWorkerErrorInfo] = useState<{ name: string; message: string } | null>(null);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [isRefreshSpinning, setIsRefreshSpinning] = useState(false);
@@ -438,71 +436,29 @@ export default function Dashboard() {
     });
   };
 
-  const openEnvInTerminal = (env: Environment) => {
-    const resolveSshHost = () => {
-      if (!env.worker_server_name) {
-        return '127.0.0.1';
+  const resolveSshHost = (env: Environment) => {
+    if (!env.worker_server_name) {
+      return '127.0.0.1';
+    }
+    const baseUrl = env.worker_server_base_url || '';
+    if (baseUrl) {
+      try {
+        return new URL(baseUrl).hostname;
+      } catch {
+        // Fall through to worker name.
       }
-      const baseUrl = env.worker_server_base_url || '';
-      if (baseUrl) {
-        try {
-          return new URL(baseUrl).hostname;
-        } catch {
-          // Fall through to worker name.
-        }
-      }
-      return env.worker_server_name;
-    };
+    }
+    return env.worker_server_name;
+  };
 
-    const host = resolveSshHost();
+  const buildSshCommand = (env: Environment) => {
+    const host = resolveSshHost(env);
     const sshUser = env.container_user || 'root';
-    const sshCommand = `ssh -p ${env.ssh_port} ${sshUser}@${host}`;
+    return `ssh -p ${env.ssh_port} ${sshUser}@${host}`;
+  };
 
-    if (env.worker_server_name) {
-      const copyWithFallback = async (text: string) => {
-        if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-          await navigator.clipboard.writeText(text);
-          return;
-        }
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.setAttribute('readonly', 'true');
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        textarea.style.left = '-9999px';
-        document.body.appendChild(textarea);
-        textarea.select();
-        const copied = document.execCommand('copy');
-        document.body.removeChild(textarea);
-        if (!copied) {
-          throw new Error('copy_failed');
-        }
-      };
-
-      copyWithFallback(sshCommand)
-        .then(() => {
-          showToast(t('feedback.dashboard.sshCopied'), 'success');
-        })
-        .catch(() => {
-          showToast(t('feedback.dashboard.copyFailedRunManually', { command: sshCommand }), 'error');
-        });
-      return;
-    }
-
-    try {
-      window.localStorage.setItem(
-        TERMINAL_ACTION_QUEUE_KEY,
-        JSON.stringify({
-          type: 'open_tab_and_run',
-          command: sshCommand,
-          environmentName: env.name,
-          requestedAt: Date.now(),
-        }),
-      );
-    } catch {
-      // Ignore storage failures and still move to terminal page.
-    }
-    navigate('/terminal');
+  const openSshAccessGuide = (env: Environment) => {
+    setSshGuideEnv(env);
   };
 
   const openJupyter = async (env: Environment) => {
@@ -606,26 +562,20 @@ export default function Dashboard() {
     const jupyterEnabled = env.enable_jupyter !== false;
     const codeEnabled = env.enable_code_server !== false;
 
-    const isWorkerEnv = Boolean(env.worker_server_name);
-
     const accessItems: Array<{ key: string; node: ReactNode }> = [
       {
         key: 'ssh',
         node: (
           <div className="relative group">
             <button
-              onClick={() => openEnvInTerminal(env)}
+              onClick={() => openSshAccessGuide(env)}
               disabled={!isRunning}
               className="p-1 hover:bg-[var(--bg-soft)] rounded text-[var(--text-muted)] hover:text-blue-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <SquareTerminal size={14} />
             </button>
             <div className="pointer-events-none absolute left-1/2 top-[-34px] -translate-x-1/2 whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-[var(--text)] opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
-              {isWorkerEnv && isRunning
-                ? t('dashboard.copySshCommand', { port: env.ssh_port })
-                : !isWorkerEnv && isRunning
-                ? t('dashboard.openInTerminal', { port: env.ssh_port })
-                : t('dashboard.environmentMustBeRunning', { port: env.ssh_port })}
+              {isRunning ? t('dashboard.openSshGuide', { port: env.ssh_port }) : t('dashboard.environmentMustBeRunning', { port: env.ssh_port })}
             </div>
           </div>
         ),
@@ -723,6 +673,34 @@ export default function Dashboard() {
         message={t('dashboard.forceDeleteEnvironmentMessage')}
         isDestructive={true}
       />
+      {sshGuideEnv && (
+        <OverlayPortal className="p-4">
+          <div className="w-full max-w-2xl rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] shadow-2xl animate-in fade-in zoom-in duration-200 overflow-hidden">
+            <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
+              <h3 className="text-lg font-bold text-[var(--text)]">{t('dashboard.sshAccessGuideTitle')}</h3>
+              <button onClick={() => setSshGuideEnv(null)} className="text-[var(--text-muted)] hover:text-[var(--text)] transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-3">
+              <p className="text-sm text-[var(--text-muted)]">{t('dashboard.sshAccessGuideFor', { name: sshGuideEnv.name })}</p>
+              <p className="text-xs text-[var(--text-muted)]">{t('dashboard.sshAccessGuideHostInfo', { host: resolveSshHost(sshGuideEnv), port: sshGuideEnv.ssh_port })}</p>
+              <div className="rounded-md border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">{t('dashboard.sshCommand')}</div>
+                <div className="mt-1 font-mono text-sm text-[var(--text)] break-all">{buildSshCommand(sshGuideEnv)}</div>
+              </div>
+            </div>
+            <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-soft)] flex justify-end">
+              <button
+                onClick={() => setSshGuideEnv(null)}
+                className="rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-2 text-sm text-[var(--text)] hover:brightness-95 transition-colors"
+              >
+                {t('actions.close')}
+              </button>
+            </div>
+          </div>
+        </OverlayPortal>
+      )}
 
       {/* Volume Details Modal */}
       {selectedVolEnv && (
