@@ -441,7 +441,7 @@ export default function Dashboard() {
   const openEnvInTerminal = (env: Environment) => {
     const resolveSshHost = () => {
       if (!env.worker_server_name) {
-        return window.location.hostname;
+        return '127.0.0.1';
       }
       const baseUrl = env.worker_server_base_url || '';
       if (baseUrl) {
