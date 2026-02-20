@@ -420,3 +420,153 @@ def test_reset_root_password_worker_commit_failure_attempts_remote_rollback(monk
     assert exc.value.detail["code"] == "password_metadata_sync_failed"
     assert db.rollback_called is True
     assert calls == ["newpass123", "oldpass"]
+
+
+def test_reset_root_password_host_success_with_wrapped_socket(monkeypatch):
+    env = _env(status="running")
+    db = _FakeDb(env)
+
+    class _Container:
+        status = "running"
+        id = "container-123"
+
+    class _Containers:
+        def get(self, name):
+            assert name == f"lyra-{env.name}-{env.id}"
+            return _Container()
+
+    class _InnerSocket:
+        def __init__(self):
+            self.payload = b""
+
+        def sendall(self, data: bytes):
+            self.payload += data
+
+    class _SocketWrapper:
+        def __init__(self, inner):
+            self._sock = inner
+
+        def close(self):
+            return None
+
+    inner_sock = _InnerSocket()
+    wrapped = _SocketWrapper(inner_sock)
+
+    class _DockerApi:
+        def exec_create(self, container_id, cmd, stdin, tty):
+            assert container_id == "container-123"
+            assert cmd == ["chpasswd"]
+            assert stdin is True
+            assert tty is False
+            return {"Id": "exec-1"}
+
+        def exec_start(self, exec_id, detach, tty, socket):
+            assert exec_id == "exec-1"
+            assert detach is False
+            assert tty is False
+            assert socket is True
+            return wrapped
+
+        def exec_inspect(self, exec_id):
+            assert exec_id == "exec-1"
+            return {"ExitCode": 0}
+
+    class _DockerClient:
+        containers = _Containers()
+        api = _DockerApi()
+
+    monkeypatch.setattr(env_router.docker, "from_env", lambda: _DockerClient())
+    monkeypatch.setattr(env_router, "encrypt_secret", lambda value: f"enc::{value}")
+
+    result = asyncio.run(
+        env_router.reset_environment_root_password(
+            str(env.id),
+            payload=EnvironmentRootPasswordResetRequest(new_password="newpass123"),
+            db=db,
+        )
+    )
+
+    assert result["message"] == "Root password updated"
+    assert db.commit_called is True
+    assert inner_sock.payload == b"root:newpass123\n"
+
+
+def test_reset_root_password_host_waits_for_delayed_exec_exit_code(monkeypatch):
+    env = _env(status="running")
+    db = _FakeDb(env)
+
+    class _Container:
+        status = "running"
+        id = "container-123"
+
+    class _Containers:
+        def get(self, name):
+            assert name == f"lyra-{env.name}-{env.id}"
+            return _Container()
+
+    class _InnerSocket:
+        def __init__(self):
+            self.payload = b""
+
+        def sendall(self, data: bytes):
+            self.payload += data
+
+        def shutdown(self, _how):
+            return None
+
+    class _SocketWrapper:
+        def __init__(self, inner):
+            self._sock = inner
+
+        def close(self):
+            return None
+
+    inner_sock = _InnerSocket()
+    wrapped = _SocketWrapper(inner_sock)
+
+    class _DockerApi:
+        def __init__(self):
+            self.inspect_count = 0
+
+        def exec_create(self, container_id, cmd, stdin, tty):
+            assert container_id == "container-123"
+            assert cmd == ["chpasswd"]
+            assert stdin is True
+            assert tty is False
+            return {"Id": "exec-1"}
+
+        def exec_start(self, exec_id, detach, tty, socket):
+            assert exec_id == "exec-1"
+            assert detach is False
+            assert tty is False
+            assert socket is True
+            return wrapped
+
+        def exec_inspect(self, exec_id):
+            assert exec_id == "exec-1"
+            self.inspect_count += 1
+            if self.inspect_count == 1:
+                return {"ExitCode": None}
+            return {"ExitCode": 0}
+
+    docker_api = _DockerApi()
+
+    class _DockerClient:
+        containers = _Containers()
+        api = docker_api
+
+    monkeypatch.setattr(env_router.docker, "from_env", lambda: _DockerClient())
+    monkeypatch.setattr(env_router, "encrypt_secret", lambda value: f"enc::{value}")
+
+    result = asyncio.run(
+        env_router.reset_environment_root_password(
+            str(env.id),
+            payload=EnvironmentRootPasswordResetRequest(new_password="newpass123"),
+            db=db,
+        )
+    )
+
+    assert result["message"] == "Root password updated"
+    assert db.commit_called is True
+    assert inner_sock.payload == b"root:newpass123\n"
+    assert docker_api.inspect_count >= 2

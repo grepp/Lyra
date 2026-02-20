@@ -26,6 +26,8 @@ const enCommon = {
     delete: 'Delete',
     selectFile: 'Select File',
     reset: 'Reset',
+    show: 'Show',
+    hide: 'Hide',
     testConnection: 'Test Connection',
   },
   labels: {

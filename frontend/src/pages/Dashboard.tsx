@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { ChevronDown, ChevronUp, Code2, HardDrive, HelpCircle, LayoutTemplate, Network, Play, RefreshCw, Square, SquareTerminal, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Code2, Eye, EyeOff, HardDrive, HelpCircle, LayoutTemplate, Network, Play, RefreshCw, Square, SquareTerminal, Trash2, X } from 'lucide-react';
 import { isValidElement, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -89,6 +89,8 @@ export default function Dashboard() {
   const [logLoading, setLogLoading] = useState(false);
   const [sshGuideEnv, setSshGuideEnv] = useState<Environment | null>(null);
   const [rootResetPassword, setRootResetPassword] = useState('');
+  const [rootResetInputError, setRootResetInputError] = useState('');
+  const [showRootResetPassword, setShowRootResetPassword] = useState(false);
   const [rootResetConfirm, setRootResetConfirm] = useState<{ envId: string; name: string; password: string } | null>(null);
   const [rootResetSubmitting, setRootResetSubmitting] = useState(false);
   const [workerErrorInfo, setWorkerErrorInfo] = useState<{ name: string; message: string } | null>(null);
@@ -514,13 +516,14 @@ export default function Dashboard() {
     if (!sshGuideEnv) return;
     const password = rootResetPassword;
     if (!password.trim()) {
-      showToast(t('feedback.dashboard.rootPasswordRequired'), 'error');
+      setRootResetInputError(t('feedback.dashboard.rootPasswordRequired'));
       return;
     }
     if (password.length < 4) {
-      showToast(t('feedback.dashboard.rootPasswordTooShort'), 'error');
+      setRootResetInputError(t('feedback.dashboard.rootPasswordTooShort'));
       return;
     }
+    setRootResetInputError('');
     setRootResetConfirm({ envId: sshGuideEnv.id, name: sshGuideEnv.name, password });
   };
 
@@ -533,6 +536,7 @@ export default function Dashboard() {
       });
       showToast(t('feedback.dashboard.rootPasswordResetSuccess'), 'success');
       setRootResetPassword('');
+      setRootResetInputError('');
       await fetchEnvironments();
     } catch (error: unknown) {
       const { code, message } = getApiErrorCodeAndMessage(error);
@@ -592,6 +596,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     setRootResetPassword('');
+    setRootResetInputError('');
+    setShowRootResetPassword(false);
   }, [sshGuideEnv?.id]);
 
   const renderAccessCell = (env: Environment): ReactNode => {
@@ -789,13 +795,26 @@ export default function Dashboard() {
                 <div className="text-xs text-[var(--text-muted)]">{t('dashboard.rootAccountSectionDescription')}</div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-medium text-[var(--text)]">{t('dashboard.accountRootLabel')}</span>
-                  <input
-                    type="password"
-                    value={rootResetPassword}
-                    onChange={(event) => setRootResetPassword(event.target.value)}
-                    placeholder={t('dashboard.rootPasswordResetInputPlaceholder')}
-                    className="flex-1 min-w-0 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-sm text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  />
+                  <div className="flex min-w-0 flex-1 items-center rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1.5 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500/20">
+                    <input
+                      type={showRootResetPassword ? 'text' : 'password'}
+                      value={rootResetPassword}
+                      onChange={(event) => {
+                        setRootResetPassword(event.target.value);
+                        if (rootResetInputError) setRootResetInputError('');
+                      }}
+                      placeholder={t('dashboard.rootPasswordResetInputPlaceholder')}
+                      className="min-w-0 flex-1 bg-transparent px-1 text-sm text-[var(--text)] focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRootResetPassword((prev) => !prev)}
+                      className="shrink-0 rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-soft)] hover:text-[var(--text)] transition-colors"
+                      aria-label={showRootResetPassword ? t('actions.hide') : t('actions.show')}
+                    >
+                      {showRootResetPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={requestRootPasswordReset}
@@ -805,6 +824,9 @@ export default function Dashboard() {
                     {t('dashboard.rootPasswordResetAction')}
                   </button>
                 </div>
+                {rootResetInputError && (
+                  <p className="text-xs text-red-500">{rootResetInputError}</p>
+                )}
               </div>
             </div>
             <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-soft)] flex justify-end shrink-0">

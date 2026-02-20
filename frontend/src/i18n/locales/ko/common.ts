@@ -26,6 +26,8 @@ const koCommon = {
     delete: '삭제',
     selectFile: '파일 선택',
     reset: '초기화',
+    show: '보기',
+    hide: '숨기기',
     testConnection: '연결 테스트',
   },
   labels: {

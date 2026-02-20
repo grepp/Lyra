@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
+import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import text
@@ -30,6 +31,7 @@ import secrets
 import time
 import random
 import logging
+import socket
 from sqlalchemy.exc import IntegrityError
 import json
 from urllib.parse import urlsplit, urlunsplit
@@ -53,6 +55,58 @@ GPU_OCCUPIED_STATUSES = {"creating", "building", "running", "starting"}
 REMOTE_SURROGATE_PORT_RANGE = (61001, 65535)
 logger = logging.getLogger(__name__)
 BUILD_ERROR_SETTING_PREFIX = "build_error:"
+
+
+def _write_exec_stdin(sock: object, payload: bytes) -> None:
+    # docker SDK may return different socket wrappers by version.
+    if hasattr(sock, "sendall"):
+        sock.sendall(payload)  # type: ignore[attr-defined]
+        return
+
+    raw_sock = getattr(sock, "_sock", None) or getattr(sock, "sock", None)
+    if raw_sock is not None and hasattr(raw_sock, "sendall"):
+        raw_sock.sendall(payload)  # type: ignore[attr-defined]
+        return
+
+    if hasattr(sock, "send"):
+        total = 0
+        while total < len(payload):
+            sent = sock.send(payload[total:])  # type: ignore[attr-defined]
+            if not sent:
+                raise RuntimeError("Failed to write docker exec stdin payload")
+            total += int(sent)
+        return
+
+    raise RuntimeError("Docker exec stdin socket does not support send operations")
+
+
+def _close_exec_stdin(sock: object) -> None:
+    raw_sock = getattr(sock, "_sock", None) or getattr(sock, "sock", None)
+    if raw_sock is not None and hasattr(raw_sock, "shutdown"):
+        try:
+            raw_sock.shutdown(socket.SHUT_WR)  # type: ignore[attr-defined]
+        except OSError:
+            pass
+    if hasattr(sock, "close"):
+        try:
+            sock.close()  # type: ignore[attr-defined]
+        except OSError:
+            pass
+
+
+async def _wait_exec_exit_code(docker_api: object, exec_id: str, timeout_seconds: float = 2.0) -> int | None:
+    deadline = time.time() + timeout_seconds
+    while True:
+        info = docker_api.exec_inspect(exec_id)  # type: ignore[attr-defined]
+        exit_code = info.get("ExitCode")
+        if exit_code is not None:
+            try:
+                return int(exit_code)
+            except (TypeError, ValueError):
+                return None
+        if time.time() >= deadline:
+            return None
+        await asyncio.sleep(0.05)
 
 
 def _extract_dockerfile_base_image(dockerfile_content: str) -> str | None:
@@ -1782,13 +1836,12 @@ async def reset_environment_root_password(
         )["Id"]
         sock = client.api.exec_start(exec_id, detach=False, tty=False, socket=True)
         try:
-            sock.sendall(f"root:{new_password}\n".encode("utf-8"))
+            _write_exec_stdin(sock, f"root:{new_password}\n".encode("utf-8"))
         finally:
-            sock.close()
+            _close_exec_stdin(sock)
 
-        exec_info = client.api.exec_inspect(exec_id)
-        exit_code = exec_info.get("ExitCode")
-        if exit_code is None or int(exit_code) != 0:
+        exit_code = await _wait_exec_exit_code(client.api, exec_id)
+        if exit_code is None or exit_code != 0:
             raise HTTPException(
                 status_code=500,
                 detail={"code": "reset_failed", "message": "Failed to reset root password"},
@@ -1829,12 +1882,11 @@ async def reset_environment_root_password(
                 )["Id"]
                 rollback_sock = client.api.exec_start(rollback_exec_id, detach=False, tty=False, socket=True)
                 try:
-                    rollback_sock.sendall(f"root:{previous_password}\n".encode("utf-8"))
+                    _write_exec_stdin(rollback_sock, f"root:{previous_password}\n".encode("utf-8"))
                 finally:
-                    rollback_sock.close()
-                rollback_info = client.api.exec_inspect(rollback_exec_id)
-                rollback_exit = rollback_info.get("ExitCode")
-                restored = rollback_exit is not None and int(rollback_exit) == 0
+                    _close_exec_stdin(rollback_sock)
+                rollback_exit = await _wait_exec_exit_code(client.api, rollback_exec_id)
+                restored = rollback_exit is not None and rollback_exit == 0
             except Exception as rollback_error:  # noqa: BLE001
                 logger.warning(
                     "Failed to rollback root password change for environment %s after DB commit error: %s",
