@@ -87,6 +87,9 @@ export default function Dashboard() {
   const [errorLog, setErrorLog] = useState<string>("");
   const [logLoading, setLogLoading] = useState(false);
   const [sshGuideEnv, setSshGuideEnv] = useState<Environment | null>(null);
+  const [rootResetPassword, setRootResetPassword] = useState('');
+  const [rootResetConfirm, setRootResetConfirm] = useState<{ envId: string; name: string; password: string } | null>(null);
+  const [rootResetSubmitting, setRootResetSubmitting] = useState(false);
   const [workerErrorInfo, setWorkerErrorInfo] = useState<{ name: string; message: string } | null>(null);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
   const [isRefreshSpinning, setIsRefreshSpinning] = useState(false);
@@ -506,6 +509,51 @@ export default function Dashboard() {
     }
   };
 
+  const requestRootPasswordReset = () => {
+    if (!sshGuideEnv) return;
+    const password = rootResetPassword;
+    if (!password.trim()) {
+      showToast(t('feedback.dashboard.rootPasswordRequired'), 'error');
+      return;
+    }
+    if (password.length < 4) {
+      showToast(t('feedback.dashboard.rootPasswordTooShort'), 'error');
+      return;
+    }
+    setRootResetConfirm({ envId: sshGuideEnv.id, name: sshGuideEnv.name, password });
+  };
+
+  const submitRootPasswordReset = async () => {
+    if (!rootResetConfirm) return;
+    setRootResetSubmitting(true);
+    try {
+      await axios.post(`environments/${rootResetConfirm.envId}/accounts/root/reset-password`, {
+        new_password: rootResetConfirm.password,
+      });
+      showToast(t('feedback.dashboard.rootPasswordResetSuccess'), 'success');
+      setRootResetPassword('');
+      await fetchEnvironments();
+    } catch (error: unknown) {
+      const { code, message } = getApiErrorCodeAndMessage(error);
+      if (code) {
+        const workerKey = `dashboard.workerError.${code}`;
+        const workerTranslated = t(workerKey);
+        if (workerTranslated !== workerKey) {
+          showToast(workerTranslated, 'error');
+        } else {
+          showToast(message || t('feedback.dashboard.rootPasswordResetFailed'), 'error');
+        }
+      } else if (message) {
+        showToast(message, 'error');
+      } else {
+        showToast(t('feedback.dashboard.rootPasswordResetFailed'), 'error');
+      }
+    } finally {
+      setRootResetSubmitting(false);
+      setRootResetConfirm(null);
+    }
+  };
+
   useEffect(() => {
     fetchEnvironments({ showLoading: true });
     const interval = setInterval(() => {
@@ -540,6 +588,10 @@ export default function Dashboard() {
       // Ignore storage write failures
     }
   }, [hasAnnouncement, isNoticeOpen]);
+
+  useEffect(() => {
+    setRootResetPassword('');
+  }, [sshGuideEnv?.id]);
 
   const renderAccessCell = (env: Environment): ReactNode => {
     const hasWorkerError = Boolean(env.worker_server_name && (env.worker_error_code || env.worker_error_message));
@@ -662,6 +714,17 @@ export default function Dashboard() {
         message={t('dashboard.forceDeleteEnvironmentMessage')}
         isDestructive={true}
       />
+      <Modal
+        isOpen={!!rootResetConfirm}
+        onClose={() => setRootResetConfirm(null)}
+        onConfirm={() => {
+          void submitRootPasswordReset();
+        }}
+        title={t('dashboard.rootPasswordResetConfirmTitle')}
+        message={t('dashboard.rootPasswordResetConfirmMessage', { name: rootResetConfirm?.name || '' })}
+        isDestructive={true}
+        confirmText={t('dashboard.rootPasswordResetConfirmAction')}
+      />
       {sshGuideEnv && (
         <OverlayPortal className="p-4">
           {(() => {
@@ -711,6 +774,28 @@ export default function Dashboard() {
                   <li>{t('dashboard.sshGuideRootWarning')}</li>
                   <li>{t('dashboard.sshGuidePlaceholderWarning')}</li>
                 </ul>
+              </div>
+              <div className="rounded-md border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-3 space-y-2">
+                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">{t('dashboard.rootAccountSectionTitle')}</div>
+                <div className="text-xs text-[var(--text-muted)]">{t('dashboard.rootAccountSectionDescription')}</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-[var(--text)]">{t('dashboard.accountRootLabel')}</span>
+                  <input
+                    type="password"
+                    value={rootResetPassword}
+                    onChange={(event) => setRootResetPassword(event.target.value)}
+                    placeholder={t('dashboard.rootPasswordResetInputPlaceholder')}
+                    className="flex-1 min-w-0 bg-[var(--bg-elevated)] border border-[var(--border)] rounded-lg px-3 py-1.5 text-sm text-[var(--text)] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={requestRootPasswordReset}
+                    disabled={rootResetSubmitting}
+                    className="shrink-0 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-1.5 text-xs text-[var(--text)] hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {t('dashboard.rootPasswordResetAction')}
+                  </button>
+                </div>
               </div>
               <p className="text-xs text-[var(--text-muted)]">{t('dashboard.sshGuideAliases', { jumpAlias: guide.jumpAlias, envAlias: guide.envAlias })}</p>
             </div>
