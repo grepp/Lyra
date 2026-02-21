@@ -730,6 +730,10 @@ export default function Dashboard() {
     () => preprocessAnnouncementTableCodeBlocks(announcementMarkdown),
     [announcementMarkdown]
   );
+  const modalSecondaryButtonClass =
+    'rounded-lg border border-[var(--border)] bg-[var(--bg-soft)] px-4 py-2 text-sm font-medium text-[var(--text)] hover:brightness-95 transition-all';
+  const modalDangerButtonClass =
+    'rounded-lg bg-red-600/90 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed';
 
   return (
     <div className="p-6 space-y-6 relative">
@@ -798,7 +802,7 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => void copySshGuideValue(guide.oneShotCommand, t('feedback.dashboard.sshGuideCommandCopied'))}
-                    className="rounded border border-[var(--border)] px-2 py-0.5 text-[10px] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg-elevated)] transition-colors"
+                    className="rounded border border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg-elevated)] transition-colors"
                   >
                     {t('dashboard.sshGuideCopyCommand')}
                   </button>
@@ -811,7 +815,7 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => void copySshGuideValue(guide.sshConfig, t('feedback.dashboard.sshGuideConfigCopied'))}
-                    className="rounded border border-[var(--border)] px-2 py-0.5 text-[10px] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg-elevated)] transition-colors"
+                    className="rounded border border-[var(--border)] px-2 py-0.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg-elevated)] transition-colors"
                   >
                     {t('dashboard.sshGuideCopyConfig')}
                   </button>
@@ -822,7 +826,7 @@ export default function Dashboard() {
             <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-soft)] flex justify-end shrink-0">
               <button
                 onClick={() => setSshGuideEnv(null)}
-                className="rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-2 text-sm text-[var(--text)] hover:brightness-95 transition-colors"
+                className={modalSecondaryButtonClass}
               >
                 {t('actions.close')}
               </button>
@@ -871,7 +875,7 @@ export default function Dashboard() {
             <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-soft)] flex justify-end gap-2">
               <button
                 onClick={() => setRootResetEnv(null)}
-                className="rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-2 text-sm text-[var(--text)] hover:brightness-95 transition-colors"
+                className={modalSecondaryButtonClass}
               >
                 {t('actions.cancel')}
               </button>
@@ -879,7 +883,7 @@ export default function Dashboard() {
                 type="button"
                 onClick={requestRootPasswordReset}
                 disabled={rootResetSubmitting}
-                className="rounded-lg bg-red-600/90 px-4 py-2 text-sm font-medium text-white transition-all hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className={modalDangerButtonClass}
               >
                 {t('dashboard.rootPasswordResetAction')}
               </button>
@@ -921,7 +925,7 @@ export default function Dashboard() {
                 <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-soft)] flex justify-end shrink-0">
                     <button
                         onClick={() => setSelectedVolEnv(null)}
-                        className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg-soft)] text-[var(--text)] hover:brightness-95 transition-all"
+                        className={modalSecondaryButtonClass}
                     >
                         {t('actions.close')}
                     </button>
@@ -959,7 +963,7 @@ export default function Dashboard() {
                 <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-soft)] flex justify-end shrink-0">
                     <button
                         onClick={() => setSelectedPortEnv(null)}
-                        className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg-soft)] text-[var(--text)] hover:brightness-95 transition-all"
+                        className={modalSecondaryButtonClass}
                     >
                         {t('actions.close')}
                     </button>
@@ -1015,7 +1019,7 @@ export default function Dashboard() {
                 <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-soft)] flex justify-end">
                     <button
                         onClick={() => setErrorLogEnv(null)}
-                        className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg-soft)] text-[var(--text)] hover:brightness-95 transition-all"
+                        className={modalSecondaryButtonClass}
                     >
                         {t('actions.close')}
                     </button>
@@ -1041,12 +1045,12 @@ export default function Dashboard() {
               <p className="text-sm text-[var(--text)]">{workerErrorInfo.message}</p>
             </div>
             <div className="p-4 border-t border-[var(--border)] bg-[var(--bg-soft)] flex justify-end">
-              <button
+            <button
                 onClick={() => setWorkerErrorInfo(null)}
-                className="px-4 py-2 rounded-lg text-sm font-medium border border-[var(--border)] bg-[var(--bg-soft)] text-[var(--text)] hover:brightness-95 transition-all"
-              >
+                className={modalSecondaryButtonClass}
+            >
                 {t('actions.close')}
-              </button>
+            </button>
             </div>
           </div>
         </OverlayPortal>
@@ -1185,7 +1189,7 @@ export default function Dashboard() {
                                       <span className="block truncate whitespace-nowrap text-[var(--text)] font-medium">
                                         {env.name}
                                       </span>
-                                      <div className="pointer-events-none absolute left-0 top-[-34px] z-20 max-w-[420px] rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-[var(--text)] opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
+                                      <div className="pointer-events-none absolute left-1/2 top-[-34px] z-20 max-w-[640px] -translate-x-1/2 overflow-x-auto whitespace-nowrap rounded-md border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1 text-xs text-[var(--text)] opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100">
                                         {env.name}
                                       </div>
                                     </div>
@@ -1313,7 +1317,7 @@ export default function Dashboard() {
                                         disabled={!env.mount_config || env.mount_config.length === 0}
                                         className={`p-2 rounded-lg transition-colors ${
                                           env.mount_config && env.mount_config.length > 0
-                                            ? "text-[var(--text-muted)] hover:text-blue-400 hover:bg-blue-500/10"
+                                            ? "text-[var(--text-muted)] hover:text-blue-400 hover:bg-[var(--bg-soft)]"
                                             : "text-[var(--text-muted)] cursor-not-allowed opacity-30"
                                         }`}
                                       >
@@ -1333,7 +1337,7 @@ export default function Dashboard() {
                                         disabled={!env.custom_ports || env.custom_ports.length === 0}
                                         className={`p-2 rounded-lg transition-colors ${
                                           env.custom_ports && env.custom_ports.length > 0
-                                            ? "text-[var(--text-muted)] hover:text-cyan-400 hover:bg-cyan-500/10"
+                                            ? "text-[var(--text-muted)] hover:text-cyan-400 hover:bg-[var(--bg-soft)]"
                                             : "text-[var(--text-muted)] cursor-not-allowed opacity-30"
                                         }`}
                                       >
