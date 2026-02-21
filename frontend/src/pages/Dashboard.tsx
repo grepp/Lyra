@@ -815,7 +815,6 @@ export default function Dashboard() {
                 <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">{t('dashboard.rootAccountSectionTitle')}</div>
                 <div className="text-xs text-[var(--text-muted)]">{t('dashboard.rootAccountSectionDescription')}</div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-[var(--text)]">{t('dashboard.accountRootLabel')}</span>
                   <div className="flex min-w-0 flex-1 items-center rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1.5 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500/20">
                     <input
                       type={showRootResetPassword ? 'text' : 'password'}
