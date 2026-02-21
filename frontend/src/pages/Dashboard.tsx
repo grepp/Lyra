@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { ChevronDown, ChevronUp, Code2, Eye, EyeOff, HardDrive, HelpCircle, KeyRound, LayoutTemplate, Network, Play, RefreshCw, Square, SquareTerminal, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Code2, Eye, EyeOff, HardDrive, HelpCircle, KeyRound, LayoutTemplate, Network, Pause, Play, RefreshCw, SquareTerminal, Trash2, X } from 'lucide-react';
 import { isValidElement, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -1298,7 +1298,7 @@ export default function Dashboard() {
                                                 {actionLoading[env.id] || isTransitioning
                                                     ? <RefreshCw size={18} className="animate-spin" />
                                                     : isRunning
-                                                        ? <Square size={18} fill="currentColor" className="opacity-80" />
+                                                        ? <Pause size={18} fill="currentColor" className="opacity-80" />
                                                         : <Play size={18} fill="currentColor" />
                                                 }
                                             </button>
