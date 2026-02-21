@@ -773,12 +773,18 @@ export default function Dashboard() {
             </div>
             <div className="p-6 space-y-3 overflow-y-auto">
               <p className="text-sm text-[var(--text-muted)]">{t('dashboard.sshAccessGuideFor', { name: sshGuideEnv.name })}</p>
-              <p className="text-xs text-[var(--text-muted)]">
-                {t('dashboard.sshAccessGuideHostInfo', { host: guide.jumpHost, port: sshGuideEnv.ssh_port })}
-              </p>
+              {showSshGuideNotes && (
+                <div className="rounded-md border px-3 py-2 text-xs" style={{ borderColor: 'var(--warning-border)', backgroundColor: 'var(--warning-bg)', color: 'var(--warning-text)' }}>
+                  <div className="font-medium" style={{ color: 'var(--warning-title)' }}>{t('dashboard.sshGuideNotes')}</div>
+                  <ul className="mt-1 list-disc pl-4 space-y-1">
+                    <li>{t('dashboard.sshGuideRootWarning')}</li>
+                    <li>{t('dashboard.sshGuidePlaceholderWarning')}</li>
+                  </ul>
+                </div>
+              )}
               <div className="rounded-md border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">{t('dashboard.sshGuideOneShot')}</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t('dashboard.sshGuideOneShot')}</div>
                   <button
                     type="button"
                     onClick={() => void copySshGuideValue(guide.oneShotCommand, t('feedback.dashboard.sshGuideCommandCopied'))}
@@ -791,7 +797,7 @@ export default function Dashboard() {
               </div>
               <div className="rounded-md border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-2">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">{t('dashboard.sshGuideConfigExample')}</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t('dashboard.sshGuideConfigExample')}</div>
                   <button
                     type="button"
                     onClick={() => void copySshGuideValue(guide.sshConfig, t('feedback.dashboard.sshGuideConfigCopied'))}
@@ -802,17 +808,8 @@ export default function Dashboard() {
                 </div>
                 <pre className="mt-1 whitespace-pre-wrap break-all font-mono text-xs text-[var(--text)]">{guide.sshConfig}</pre>
               </div>
-              {showSshGuideNotes && (
-                <div className="rounded-md border px-3 py-2 text-xs" style={{ borderColor: 'var(--warning-border)', backgroundColor: 'var(--warning-bg)', color: 'var(--warning-text)' }}>
-                  <div className="font-medium" style={{ color: 'var(--warning-title)' }}>{t('dashboard.sshGuideNotes')}</div>
-                  <ul className="mt-1 list-disc pl-4 space-y-1">
-                    <li>{t('dashboard.sshGuideRootWarning')}</li>
-                    <li>{t('dashboard.sshGuidePlaceholderWarning')}</li>
-                  </ul>
-                </div>
-              )}
               <div className="rounded-md border border-[var(--border)] bg-[var(--bg-soft)] px-3 py-3 space-y-2">
-                <div className="text-[10px] uppercase tracking-wide text-[var(--text-muted)]">{t('dashboard.rootAccountSectionTitle')}</div>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">{t('dashboard.rootAccountSectionTitle')}</div>
                 <div className="text-xs text-[var(--text-muted)]">{t('dashboard.rootAccountSectionDescription')}</div>
                 <div className="flex items-center gap-2">
                   <div className="flex min-w-0 flex-1 items-center rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-2 py-1.5 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500/20">
@@ -839,7 +836,7 @@ export default function Dashboard() {
                     type="button"
                     onClick={requestRootPasswordReset}
                     disabled={rootResetSubmitting}
-                    className="shrink-0 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-1.5 text-xs text-[var(--text)] hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="shrink-0 rounded-lg bg-red-600/90 px-3 py-1.5 text-xs font-medium text-white transition-all hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {t('dashboard.rootPasswordResetAction')}
                   </button>
