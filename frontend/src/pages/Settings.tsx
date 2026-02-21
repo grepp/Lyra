@@ -1351,7 +1351,7 @@ export default function Settings() {
                 <button
                   type="button"
                   onClick={() => setSshResetConfirmOpen(true)}
-                  className={`${dangerButtonClass} w-full sm:w-auto px-6 font-medium`}
+                  className={`${dangerButtonClass} w-full sm:w-auto px-6 py-2.5 font-medium`}
                 >
                   {t('actions.reset')}
                 </button>
