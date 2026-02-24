@@ -104,10 +104,14 @@ const buildManagedBlocks = (enableJupyter: boolean, enableCodeServer: boolean, e
       '    export RUNZSH=no CHSH=no KEEP_ZSHRC=yes && \\',
       '    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended && \\',
       '    ZSH_CUSTOM_PATH="${ZSH_CUSTOM:-/root/.oh-my-zsh/custom}" && \\',
-      '    git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions "${ZSH_CUSTOM_PATH}/plugins/zsh-autosuggestions" && \\',
-      '    git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting "${ZSH_CUSTOM_PATH}/plugins/zsh-syntax-highlighting" && \\',
+      '    if [ ! -d "${ZSH_CUSTOM_PATH}/plugins/zsh-autosuggestions" ]; then git clone --depth=1 https://github.com/zsh-users/zsh-autosuggestions "${ZSH_CUSTOM_PATH}/plugins/zsh-autosuggestions"; fi && \\',
+      '    if [ ! -d "${ZSH_CUSTOM_PATH}/plugins/zsh-syntax-highlighting" ]; then git clone --depth=1 https://github.com/zsh-users/zsh-syntax-highlighting "${ZSH_CUSTOM_PATH}/plugins/zsh-syntax-highlighting"; fi && \\',
+      '    if [ ! -f /root/.zshrc ] && [ -f /root/.oh-my-zsh/templates/zshrc.zsh-template ]; then cp /root/.oh-my-zsh/templates/zshrc.zsh-template /root/.zshrc; fi && \\',
       '    if [ -f /root/.zshrc ]; then \\',
+      '      grep -q "^export ZSH=" /root/.zshrc || printf "\\nexport ZSH=$HOME/.oh-my-zsh\\n" >> /root/.zshrc; \\',
+      '      grep -q "oh-my-zsh.sh" /root/.zshrc || printf "source $ZSH/oh-my-zsh.sh\\n" >> /root/.zshrc; \\',
       '      sed -i "s/^plugins=.*/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/" /root/.zshrc || true; \\',
+      '      grep -q "^plugins=" /root/.zshrc || printf "plugins=(git zsh-autosuggestions zsh-syntax-highlighting)\\n" >> /root/.zshrc; \\',
       '    fi && \\',
       '    test -d /root/.oh-my-zsh',
       `${MANAGED_OH_MY_ZSH_END}`
@@ -277,7 +281,7 @@ export default function Provisioning() {
     return () => {
       isMounted = false;
     };
-  }, [fetchGpuResources, fetchWorkerServers, isWorkerSelectable, showToast, t]);
+  }, [executionTarget, fetchGpuResources, fetchWorkerServers, isWorkerSelectable, showToast, t]);
 
   useEffect(() => {
     if (isInitializingTargets) return;
