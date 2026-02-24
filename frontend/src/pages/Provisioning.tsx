@@ -109,7 +109,7 @@ const buildManagedBlocks = (enableJupyter: boolean, enableCodeServer: boolean, e
       '    if [ ! -f /root/.zshrc ] && [ -f /root/.oh-my-zsh/templates/zshrc.zsh-template ]; then cp /root/.oh-my-zsh/templates/zshrc.zsh-template /root/.zshrc; fi && \\',
       '    if [ -f /root/.zshrc ]; then \\',
       '      grep -q "^export ZSH=" /root/.zshrc || printf "\\nexport ZSH=$HOME/.oh-my-zsh\\n" >> /root/.zshrc; \\',
-      '      grep -q "oh-my-zsh.sh" /root/.zshrc || printf "source $ZSH/oh-my-zsh.sh\\n" >> /root/.zshrc; \\',
+      '      grep -q "oh-my-zsh.sh" /root/.zshrc || printf "source \\$ZSH/oh-my-zsh.sh\\n" >> /root/.zshrc; \\',
       '      sed -i "s/^plugins=.*/plugins=(git zsh-autosuggestions zsh-syntax-highlighting)/" /root/.zshrc || true; \\',
       '      grep -q "^plugins=" /root/.zshrc || printf "plugins=(git zsh-autosuggestions zsh-syntax-highlighting)\\n" >> /root/.zshrc; \\',
       '    fi && \\',
